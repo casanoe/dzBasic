@@ -1,6 +1,6 @@
-![Visitors](https://visitor-badge.glitch.me/badge?page_id=dzbasic)
+![Visitors](https://visitor-badge.glitch.me/badge?page_id=casanoe_dzBasic)
 [![Repos](https://badges.pufler.dev/repos/casanoe)](https://github.com/casanoe)
-![Updated](https://badges.pufler.dev/updated/casanoe/dzbasic)
+![Updated](https://badges.pufler.dev/updated/casanoe/dzBasic)
 # DzBasic
 
 DzBasic is another way for scripting in Domoticz.
@@ -43,15 +43,17 @@ global_data.lua (functions and shared data)
 Copy and paste the content of these files in the domoticz editor (use dzvents template).
 
 Another way is to copy these 2 files into the domoticz directory:
-```domoticz/```
+```domoticz/scripts/dzVents/scripts/```
 
 
 The other files are optional:
 
 ```
-netatmo.lua     (plugin, get informations from netatmo)
-meteo.lua       (plugin, get information from openweathermap)
-meteofrance.lua (plugin, get information from meteofrance)
+netatmo.lua             (plugin, get information from netatmo)
+meteo.lua               (plugin, get meteo from openweathermap)
+meteofrance.lua         (plugin, get meteo from meteofrance)
+vigilance.lua           (plugin, get vigilance info from meteofrance)
+myplugin_template.lua   (plugin template)
 ```
 
 ## Quick start
@@ -271,6 +273,23 @@ update "Level", "my_selector"
 update "A text"
 ```
 
+### How to get an attribute of a device ?
+
+Put anywhere in the code a formated command:
+```lua
+%%device_name#attribute%%   (return the attribute value of device_name)
+%%attribute%%               (return the attribute value of current device)
+```
+dzBasic will replace it by the right value or an empty string.
+For `attribute` value see the [Domoticz documentation](https://www.domoticz.com/wiki/DzVents:_next_generation_Lua_scripting#Device_attributes_and_methods_for_all_devices).
+
+Examples:
+```lua
+$temp = %%my_temp_sensor#temperature%%
+print "Text device (%%name%%) value is %%value%%"
+$var = %%my_variable_name#value%%
+```
+
 ### Manage events
 
 Except for the specifics events, you can create and manipulate your own events. The custom events are global, ie visible from everywhere.
@@ -464,7 +483,7 @@ See dzbasic code for examples
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
+Please read [CONTRIBUTING.md](https://github.com/casanoe/dzBasic/blob/master/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
 
 ## Authors
 
@@ -472,14 +491,14 @@ Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c6
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
 
 ## Acknowledgments
 
 
 
 ## DzBasic version History
-### [1.0 beta]
+### [1.0 beta 1]
 Date: 25 April 2021
 - First version, first beta
 - Simple event system
