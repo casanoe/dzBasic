@@ -8,6 +8,7 @@ Documentation is good, examples are better.
 
 <!-- TOC -->
 
+- [Table of contents](#table-of-contents)
 - [Ex1 - Turn off device after 5 min](#ex1---turn-off-device-after-5-min)
 - [Ex2 - Turn off device after 5 min if motion sensors are off](#ex2---turn-off-device-after-5-min-if-motion-sensors-are-off)
 - [Ex3 - Turn off device after 5 min if motion sensors are off from 2 min](#ex3---turn-off-device-after-5-min-if-motion-sensors-are-off-from-2-min)
@@ -28,7 +29,7 @@ Documentation is good, examples are better.
 - [Ex17 - Be notified when a lamp is on and no one is at home](#ex17---be-notified-when-a-lamp-is-on-and-no-one-is-at-home)
 - [Ex18 - Interact with a Telegram bot](#ex18---interact-with-a-telegram-bot)
 - [Ex19 - French holidays](#ex19---french-holidays)
-- [Changelog](#changelog)
+- [Ex20 - Be notified if the public ip address change](#ex20---be-notified-if-the-public-ip-address-change)
 
 <!-- /TOC -->
 
@@ -46,11 +47,11 @@ dzbasic
 auto off when minutesago >= 5, state "motion1,motion2" = alloff
 ```
 
-## Ex3 - Turn off device after 5 min if motion sensors are off from 2 min
-
+## Ex3 - Turn off devices after 5 min if motion sensors are off from 2 min
+_"motion%d"_ refers to all devices named motion1, motion2, motion3...
 ```lua
 dzbasic
-auto off when minutesago >= 5, state "motion sensor nb %d" = alloff , minutesago "motion sensor nb %d" >=2
+auto off when minutesago >= 5, state "motion%d" = alloff , minutesago "motion%d" >=2
 ```
 
 ## Ex4 - If a switch is turned on, do something
@@ -66,11 +67,9 @@ endon
 These events are updated every minute and are visible from everywhere:
 ```lua
 dzbasic
--- based on temperature of current sensor
 event ev_outdoor1 when %%temperature%% < 10 or %%temperature%% > 30
 event ev_outdoor2 when %%temperature%% < 5, time = "7:00-9:00"
--- based on humidity of sensor named 'sensor'
-event ev_outdoor3 when %%sensor#humidity%% > 50
+event ev_outdoor3 when %%sensorhum#humidity%% > 50
 ```
 
 ## Ex6 - Be notified if a custom event is on for a number of minutes
@@ -154,7 +153,7 @@ endon
 ## Ex14 - Updates every 5 min the public ip address in a text device
 
 ```lua
-dzBasic
+dzbasic
 after 5: update @url("https://api.ipify.org")
 ```
 
@@ -182,11 +181,11 @@ endon
 ```
 
 ## Ex17 - Be notified when a lamp is on and no one is at home
-
+Reminder: _"Light"_ refers to all devices whose name begins with _Light_
+and _"Presence"_ refers to all devices whose name begins with _Presence_.
 ```lua
 dzbasic
 -- At least one device "Light" is on; and all devices "Presence" are off
--- Reminder: "Light" is equivalent to "^Light.*" (lua pattern)
 on state "Light" = on, state "Presence" = alloff
   notification "Lights turned off, nobody is at home"
   switch off, "Light"
@@ -194,10 +193,11 @@ endon
 ```
 
 ## Ex18 - Interact with a Telegram bot
-We assumed that an external script update a text device with the Telegram messages
+We assumed that an external script updates a text device with the Telegram messages
 ```lua
 dzbasic
 on dz_update
+  -- drop accents and unnecessary spaces
   $text = @cleanstr("%%text%%")
   if $text == "alarm on": switch on "Alarm"
   if $text == "alarm off": switch off "Alarm"
@@ -207,6 +207,7 @@ endon
 ```
 
 ## Ex19 - French holidays
+
 ```lua
 on time = "1:00"
   url "http://domogeek.entropialux.com/schoolholiday/B/now/"
@@ -218,7 +219,20 @@ on time = "1:00"
 endon
 ```
 
+## Ex20 - Be notified if the public ip address change
+
+```lua
+dzBasic
+on minutesago > 30
+  url "https://api.ipify.org"
+  if %%text%% ~= $$ : notification "New IP= "..$$
+  update $$
+endon
+
+
 ## Changelog
 - 26/04/21 : Creation
 - 27/04/21 : Addon, corrections (Ex5, Ex13, Ex9)
-- 27/04/21 : Addon, Corrections (Ex5, Ex6)
+- 27/04/21 : Addon, corrections (Ex5, Ex6)
+- 28/04/21 : Addon, improve explication, corrections
+- 29/04/21 : Addon, corrections
