@@ -139,7 +139,7 @@ Description field doesn't begin with the word 'dzbasic'.
 This is only a description text. Enjoy !
 ```
 
-More examples in [EXAMPLES.md](https://github.com/casanoe/dzBasic/blob/master/CONTRIBUTING.md)
+More examples in [EXAMPLES.md](https://github.com/casanoe/dzBasic/blob/master/EXAMPLES.md)
 
 ## Syntax
 
