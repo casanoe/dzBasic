@@ -4,7 +4,12 @@ version: 1.0
 
 description: meteofrance vigilance plugin for dzbasic
 
-One optional argument: dept (number of departement, default 28)
+1 optional argument: dept (departement number in France, default 28)
+
+Return: table
+ txtcol     = vigilance color level (text)
+ col        = vigilance color level (number)
+ vigilance  = text describing the weather event
 
 author : casanoe
 creation : 16/04/2021

@@ -4,8 +4,14 @@ version: 1.0
 
 description: openweathermap meteo plugin for dzbasic
 
-Please create a custom variable "openweathermap_appid" with your api token
-Optional arguments: lat (latitude), lon (longitude), lang (language), appid (openweathermap api token)
+To be created: a custom variable "openweathermap_appid" with your api token
+
+4 optional arguments:
+- lat: latitude, lon: longitude (default: domoticz localisation)
+- lang: language (default: fr)
+- appid : openweathermap api token (default: value of custom variable "openweathermap_appid")
+
+Return: table
 
 author : casanoe
 creation : 16/04/2021
