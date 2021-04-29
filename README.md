@@ -18,6 +18,7 @@ To be used in moderation :)
 
 ## Getting Started
 First of all, installing dzBasic will not affect any of the scripts you have already in place so you can try dzBasic without disrupting things.
+However, I advise you to make a preliminary backup of the Domoticz database.
 
 The installation is very easy. Just 2 DzVents files are necessary.
 
@@ -137,6 +138,8 @@ Example 4: do nothing
 Description field doesn't begin with the word 'dzbasic'.
 This is only a description text. Enjoy !
 ```
+
+More examples in [EXAMPLES.md](https://github.com/casanoe/dzBasic/blob/master/CONTRIBUTING.md)
 
 ## Syntax
 
@@ -504,3 +507,6 @@ Date: 25 April 2021
 - Simple event system
 - Simple basic commands
 - Plugin system
+### [1.0 beta 1.1]
+Date: 29 April 2021
+- Add support of uservariable 'dzBasic' (content interpreted by dzBasic)

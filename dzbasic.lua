@@ -1,18 +1,19 @@
 --[[
 name : dzBasic.lua
-version: 1.0 beta 1
+version: 1.0 beta 1.1
 
 author : casanoe
 creation : 16/04/2021
 update : 25/04/2021
 
-TODO : ?
+CHANGELOG:
+* 1.0 beta 1.1: add support of uservariable 'dzBasic' (content interpreted by dzBasic)
 
 --]]
 
 -- Script description
 local scriptName = 'dzBasic'
-local scriptVersion = '1.0 beta 1'
+local scriptVersion = '1.0 beta 1.1'
 
 -- Dzvents
 return {
@@ -469,8 +470,8 @@ return {
                         b = b and state_managedEvent(v[1])
                         if state_managedEvent(v[1]) then
                             e = managedEvent(v[1])
-                            if v[2] == 'duration' then b = b and cmp(e.first, v[4], v[3])
-                            elseif v[2] == 'repeat' then b = b and cmp(e.nb, v[4], v[3])
+                            if v[2] == 'duration' then b = b and _cmp(e.first, v[4], v[3])
+                            elseif v[2] == 'repeat' then b = b and _cmp(e.nb, v[4], v[3])
                             end
                         end
                     elseif v[1] == 'secondsago' then
@@ -583,6 +584,8 @@ return {
             local n = need('ALPHA', '?EXPR')
             if n[1] == 'initiglobaldata' then
                 init_globalData()
+            elseif n[1] == 'printeventdump' then
+                aprint("<DZB> DUMP event "..n[2]..", STATE= "..tostring(mevent(n[2])), managedEvent(n[2]))
             elseif n[1] == 'clearallevents' then
                 microbasic.events = {}
                 dz.globalData.initialize('managedEvent')
@@ -590,6 +593,7 @@ return {
                 microbasic.vars = {}
                 dz.globalData.initialize('globalvars')
             elseif n[1] == 'printdevicedump' then
+                aprint("<DZB> DUMP device "..microbasic.curdev.name)
                 microbasic.curdev.dump()
             elseif n[1] == 'moveback' then
                 microbasic.curtok = microbasic.curtok - (tonumber(n[2]) or 1)
@@ -637,7 +641,8 @@ return {
             context['events']['dz_batterylow'] = device.batteryLevel and (device.batteryLevel <= DZ_BATTERY_THRESHOLD)
             context['events']['dz_timedout'] = device.timedOut
             context['events']['dz_signallow'] = device.signalLevel and (device.signalLevel <= DZ_SIGNAL_THRESHOLD)
-            interpret(dzbformat(device.description, microbasic.curdev.idx), context)
+            local code = device.description or "dzbasic\n\r"..device.value or ''
+            interpret(dzbformat(code, microbasic.curdev.idx), context)
         end
 
         function log(s)
@@ -678,10 +683,12 @@ return {
         elseif triggeredItem.isSystemEvent and triggeredItem.type ~= 'start' and triggeredItem.type ~= 'stop' then
             if triggeredItem.type == 'resetAllEvents' then
                 init_globalData()
-                set_globalvars('DZ_LATITUDE', dz.settings.location.latitude)
-                set_globalvars('DZ_LONGITUDE', dz.settings.location.longitude)
                 set_globalvars('DZ_URL', dz.settings.url)
+                sendCustomEvent('start_dzBasic')
             end
+        elseif triggeredItem.isVariable then
+            start(triggeredItem, context)
+            triggeredItem.set('').silent()
         else
             if triggeredItem.isSystemEvent then
                 context['events']['dz_sys'] = true
