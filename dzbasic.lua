@@ -426,11 +426,17 @@ return {
 
         function w_auto()
             local n1 = need('onoff|on|off|toggle|dim|level|update')
-            local n2 = (n1[1] == 'dim' and need('NUMBER', '?,', 'NUMBER')) or
-            (n1[1] == 'level' and need('ALPHA|NUMBER|STRING')) or
-            (n1[1] == 'update' and need('EXPR')) or {}
+            local n2 = {}
+            if n1[1] == 'dim' then n2 = need('NUMBER', '?,', 'NUMBER')
+            elseif n1[1] == 'level' then n2 = need('ALPHA|NUMBER|STRING')
+            elseif n1[1] == 'update' then n2 = need('EXPR')
+            end
             local n3 = need('STRING?', 'at|after|when?')
-            local n4 = (n3[2] == 'at' and need('STRING')) or (n3[2] == 'when' and won()) or need('NUMBER?')
+            local n4
+            if n3[2] == 'at' then n4 = need('STRING')
+            elseif n3[2] == 'when' then n4 = won()
+            else n4 = need('NUMBER?')
+            end
 
             local b = false
             if event('dz_timer') and n3[2] == 'at' then
