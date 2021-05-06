@@ -1,10 +1,10 @@
 --[[
 name : global_data.lua
-version: 1.0 beta 1
+version: 1.0 beta
 
 author : casanoe
 creation : 16/04/2021
-update : 25/04/2021
+update : 05/05/2021
 
 TODO : ?
 
@@ -21,13 +21,22 @@ return {
         load_dzBasicLibs = function(dz, options)
 
             --------------------
-            --   VARS & LIBS  --
+            --      LIBS      --
             --------------------
 
             local dzu = dz.utils
             local lodash = dzu._
 
-            local C_GARBAGE_EVENT_FREQ = 7 * 24 * 3600 -- every 7 days
+            --------------------
+            --      VARS      --
+            --------------------
+
+            C_GARBAGE_EVENT_FREQ = 7 * 24 * 3600 -- every 7 days
+
+            DZB_TIMEOUT = 2
+            DZ_BATTERY_THRESHOLD = 10
+            DZ_SIGNAL_THRESHOLD = 10
+            DZ_LANG = 'fr'
 
             --------------------
             --      TOOLS     --
@@ -51,7 +60,7 @@ return {
             end
 
             function tprint(t)
-                for k, v in pairs(t) do print(k..' ==> '..v) end
+                for k, v in pairs(t) do print(k..' ==> '..(tostring(v) or 'nil')) end
             end
 
             function dzlog(s, l)
@@ -70,6 +79,23 @@ return {
 
             function strFind(s, f)
                 return string.find('|'..s:lower()..'|', '|'..tostring(f):lower()..'|', 1, true) ~= nil
+            end
+
+            --------------------
+            --      GEO       --
+            --------------------
+
+            function geoLoc(addr, lat, lon)
+                local u
+                if not addr or addr == '' then
+                    lat = lat or tostring(dz.settings.location.latitude)
+                    lon = lon or tostring(dz.settings.location.longitude)
+                    u = simpleCurl('"https://nominatim.openstreetmap.org/reverse?lat='..lat..'&lon='..lon..'&format=jsonv2&zoom=10"')
+                    return fromData(u)
+                else
+                    u = simpleCurl('"https://nominatim.openstreetmap.org/search?q='..dzu.urlEncode(addr)..'&format=jsonv2&addressdetails=1"')
+                    return fromData(u)[1]
+                end
             end
 
             --------------------
@@ -119,7 +145,7 @@ return {
                 if not settings['QUIET'] or not timeRule(settings['QUIET']) then
                     local subsystems = settings['SUBSYSTEMS'] or ''
                     subsystems = subsystems:gsub('([^,]+)', function(x) return dz['NSS_'..x] end)
-                    local subject = settings['SUBJECT'] or 'dz'
+                    local subject = settings['SUBJECT'] or 'domoticz'
                     local priority = dz['PRIORITY_'..(settings['PRIORITY'] or 'NORMAL')]
                     if settings['FREQUENCY'] then
                         local n1 = managedEvent(message) and managedEvent(message)['nb']
@@ -221,18 +247,20 @@ return {
                 local now = os.time(os.date('*t'))
                 local e = dz.globalData.managedEvent[id] or { nb = 0, last = now, first = 0 }
                 e.nb = (f == true and e.nb + 1) or (f == false and 0) or e.nb
-                e.last = (f == true and now) or (f == false and 0) or e.last
-                e.first = (e.nb == 0 and 0) or (e.nb == 1 and now) or e.first
+                --e.last = (f == true and now) or (f == false and 0) or e.last
+                e.last = now
+                --e.first = (e.nb == 0 and 0) or (e.nb == 1 and now) or e.first
+                e.first = (f == true and e.nb <= 1 and now) or (e.nb == 0 and 0) or e.first
                 dz.globalData.managedEvent[id] = e
                 return e
             end
 
             function is_managedEvent(id)
-                return dz.globalData.managedEvent[id] ~= nil
+                return id and dz.globalData.managedEvent[id] ~= nil
             end
 
             function state_managedEvent(id)
-                return dz.globalData.managedEvent[id] and dz.globalData.managedEvent[id].nb > 0
+                return is_managedEvent(id) and dz.globalData.managedEvent[id].nb > 0
             end
 
             function sendCustomEvent(e, context)
@@ -320,10 +348,12 @@ return {
             end
 
             function dzbswitch(id, c, settings)
+                local haschanged = false
                 c = c:sub(1, 1):upper()..c:sub(2):lower()
                 settings = settings or {}
                 group(id,
                     function(d)
+                        haschanged = haschanged or (d.state ~= c)
                         if c == 'Flash' then
                             d.setState('Toggle').forSec(1).repeatAfterSec(1, 5)
                         elseif settings['checkfirst'] and d.state == c then
@@ -335,20 +365,27 @@ return {
                         end
                     end
                 )
+                return haschanged
             end
 
             function dzbupdate(id, v, n, settings)
+                local haschanged = false
                 group(id,
                     function(d)
                         if d.switchType == 'Dimmer' and type(v) == 'number' then
+                            haschanged = haschanged or (d.level ~= v)
                             d.dimTo(constrain(v, 0, 100))
                         elseif d.switchType == 'Selector' then
+                            haschanged = haschanged or (d.levelName ~= v)
                             d.switchSelector(v)
                         else
+                            haschanged = haschanged or (d.sValue ~= v)
+                            if n then haschanged = haschanged or (d.nValue ~= n) end
                             d.setValues(n, dzu.urlEncode(v))
                         end
                     end
                 )
+                return haschanged
             end
 
             function group(filter, func, b)
@@ -385,7 +422,7 @@ return {
                 elseif op == '>=' then return x >= y
                 elseif op == '<=' then return x <= y
                 elseif op == '~' or op == '~=' or op == '<>' then return x ~= y
-                elseif op == '=' or op == '==' then return x == y
+                elseif op == '=' or op == '==' or not op then return x == y
                 else return false
                 end
             end

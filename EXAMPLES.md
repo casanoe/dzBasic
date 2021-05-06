@@ -8,10 +8,9 @@ Documentation is good, examples are better.
 
 <!-- TOC -->
 
-- [Table of contents](#table-of-contents)
 - [Ex1 - Turn off device after 5 min](#ex1---turn-off-device-after-5-min)
 - [Ex2 - Turn off device after 5 min if motion sensors are off](#ex2---turn-off-device-after-5-min-if-motion-sensors-are-off)
-- [Ex3 - Turn off device after 5 min if motion sensors are off from 2 min](#ex3---turn-off-device-after-5-min-if-motion-sensors-are-off-from-2-min)
+- [Ex3 - Turn off devices after 5 min if motion sensors are off from 2 min](#ex3---turn-off-devices-after-5-min-if-motion-sensors-are-off-from-2-min)
 - [Ex4 - If a switch is turned on, do something](#ex4---if-a-switch-is-turned-on-do-something)
 - [Ex5 - Create custom events](#ex5---create-custom-events)
 - [Ex6 - Be notified if a custom event is on for a number of minutes](#ex6---be-notified-if-a-custom-event-is-on-for-a-number-of-minutes)
@@ -30,6 +29,14 @@ Documentation is good, examples are better.
 - [Ex18 - Interact with a Telegram bot](#ex18---interact-with-a-telegram-bot)
 - [Ex19 - French holidays](#ex19---french-holidays)
 - [Ex20 - Be notified if the public ip address change](#ex20---be-notified-if-the-public-ip-address-change)
+- [Ex21 - Push on quickly 2 times](#ex21---push-on-quickly-2-times)
+- [Ex22 - Switch on/off quickly 2 or 3 times](#ex22---switch-onoff-quickly-2-or-3-times)
+- [Ex23 - Day off](#ex23---day-off)
+- [Ex24 - Auto on device between 20h and 22h, and keep it off all other times](#ex24---auto-on-device-between-20h-and-22h-and-keep-it-off-all-other-times)
+- [Ex25 - Calculate every 30min the travel time between your home and the Eiffel Tower (Waze)](#ex25---calculate-every-30min-the-travel-time-between-your-home-and-the-eiffel-tower-waze)
+- [Ex26 - Meteo in Paris (OpenWeathermap)](#ex26---meteo-in-paris-openweathermap)
+- [Ex27 - French holidays in Toulouse (BigInfo)](#ex27---french-holidays-in-toulouse-biginfo)
+- [Changelog](#changelog)
 
 <!-- /TOC -->
 
@@ -76,8 +83,8 @@ event ev_outdoor3 when %%sensorhum#humidity%% > 50
 Reuse of ev_outdoor1 event declared in Ex5
 ```lua
 dzbasic
-on ev_outdoor1 duration >= 5
-  notification "Outdoor temp ", FREQUENCY = 60, QUIET = "22:00-08:00", SUBSYSTEMS = "PROWL"
+on ev_outdoor1 duration >= 300 -- 5min
+  notification "Outdoor temp alert", FREQUENCY = 60, QUIET = "22:00-08:00", SUBSYSTEMS = "PROWL"
 endon
 ```
 
@@ -92,7 +99,7 @@ on state = on, minutesago >= 5: notification "%%name%% on > 5 min", FREQUENCY = 
 
 ```lua
 dzbasic
-auto off at "01:00 on monday"
+auto off at "at 01:00 on monday"
 ```
 
 ## Ex9 - Gradually increase every 2 min the level of the light from the last level to 50%, by step 5%.
@@ -144,7 +151,7 @@ icon 110
 We assume that the values 100 to 700 correspond to the icon number in Domoticz.
 ```lua
 dzbasic
-on time "00:00"
+on time "at 00:00"
   $ICONS = 100,200,300,400,500,600,700
   icon $ICONS[@date("%w")+1]
 endon
@@ -157,11 +164,18 @@ dzbasic
 after 5: update @url("https://api.ipify.org")
 ```
 
+or
+
+```lua
+dzbasic
+auto update @url("https://api.ipify.org") after 5
+```
+
 ## Ex15 - Execute a long http request with a timeout of 5s, and catch the result
 
 ```lua
 dzbasic
-at "10:00" : url "https://longtimeresult.com/returnvalue", cb, 5
+at "at 10:00" : url "https://longtimeresult.com/returnvalue", cb, 5
 on dz_url : print "The site return "..$$
 ```
 
@@ -209,8 +223,10 @@ endon
 ## Ex19 - French holidays
 
 ```lua
-on time = "1:00"
-  url "http://domogeek.entropialux.com/schoolholiday/B/now/"
+dzbasic
+on time = "at 1:00"
+  $zone="B"
+  url "http://domogeek.entropialux.com/schoolholiday/"..$zone.."/now/"
   if $$ == "False"
     switch off, checkfirst
   else
@@ -219,17 +235,106 @@ on time = "1:00"
 endon
 ```
 
+or
+
+```lua
+dzbasic
+$zone="B"
+on time = "at 1:00": auto onoff when @url("http://domogeek.entropialux.com/schoolholiday/"..$zone.."/now/")~="False"
+```
+
 ## Ex20 - Be notified if the public ip address change
 
 ```lua
-dzBasic
-on minutesago > 30
+dzbasic
+on minutesago > 120
   url "https://api.ipify.org"
   if %%text%% ~= $$ : notification "New IP= "..$$
   update $$
 endon
 ```
 
+or
+
+```lua
+dzbasic
+after 120: update @url("https://api.ipify.org")
+on dz_selfchange : notification "New IP= %%text%%"
+```
+
+## Ex21 - Push on quickly 2 times
+
+```lua
+dzbasic
+-- trigger event if the button is pushed within 1 second after the last push
+event ev_quickpushonbutton when dz_update, secondsago <= 1
+
+on ev_quickpushonbutton repeat = 2
+  print "The button was pressed 2 times"
+endon
+```
+
+## Ex22 - Switch on/off quickly 2 or 3 times
+
+```lua
+dzbasic
+on dz_switchon
+  event ev_quickswitchonoff when repeat <= 2
+  on ev_quickswitchonoff repeat = 1 : print "Action 1"
+  on ev_quickswitchonoff repeat = 2 : print "Action 2"
+  on ev_quickswitchonoff repeat = 0 : print "Default Action"
+endon
+```
+
+## Ex23 - Day off
+Prerequisite : install the plugin biginfo.lua
+```lua
+dzbasic
+auto onoff when $BI_ISWE or $BI_ISPUBHOLIDAYS
+```
+
+## Ex24 - Auto on device between 20h and 22h, and keep it off all other times
+
+```lua
+dzbasic
+auto onoff at "20:00-22:00"
+```
+or
+```lua
+dzbasic
+auto on at "20:00-22:00"
+auto off at "22:00-00:00 and 00:00-20:00"
+```
+
+## Ex25 - Calculate every 30min the travel time between your home and the Eiffel Tower (Waze)
+Prerequisite : install the plugin waze.lua
+```lua
+dzbasic
+on minutesago >= 30
+  call waze, dest_addr="5 Avenue Anatole France, 75007 Paris"
+  update $$["totalRouteTime"]
+endon
+```
+
+## Ex26 - Meteo in Paris (OpenWeathermap)
+Prerequisite : install the plugin meteo.lua
+```lua
+dzbasic
+on minutesago >= 30
+  call meteo, addr="5 Avenue Anatole France, 75007 Paris", appid="xxxxxxxxxxx"
+  update $$["meteo"]
+endon
+```
+
+## Ex27 - French holidays in Toulouse (BigInfo)
+Prerequisite : install the plugin biginfo.lua
+```lua
+dzbasic
+on minutesago >= 30
+  call biginfo, addr="mairie de Toulouse"
+  print "Vacances à Toulouse: "..$$["BI_HOLIDAYS"]
+endon
+```
 
 ## Changelog
 - 26/04/21 : Creation
@@ -237,3 +342,4 @@ endon
 - 27/04/21 : Addon, corrections (Ex5, Ex6)
 - 28/04/21 : Addon, improve explication, corrections
 - 29/04/21 : Addon, corrections
+- 05/05/21 : Addon, corrections

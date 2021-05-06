@@ -1,21 +1,22 @@
 --[[
 name : meteo.lua
-version: 1.0
+version: 1.1
 
 description: openweathermap meteo plugin for dzbasic
 
 To be created: a custom variable "openweathermap_appid" with your api token
 
-4 optional arguments:
+5 optional arguments:
 - lat: latitude, lon: longitude (default: domoticz localisation)
 - lang: language (default: fr)
+- addr: address of a place
 - appid : openweathermap api token (default: value of custom variable "openweathermap_appid")
 
 Return: table
 
 author : casanoe
 creation : 16/04/2021
-update : 16/04/2021
+update : 05/05/2021
 
 --]]
 
@@ -47,10 +48,18 @@ return {
         local context = dzBasicCall_getData('meteo')
         local args = context['args']
 
-        local loc = 'lat='..(args['lat'] or dz.settings.location.latitude)
+        local addr, loc, appid, lang
+
+        if args['addr'] then
+            addr = geoLoc(args['addr'])
+            args['lon'] = addr['lon']
+            args['lat'] = addr['lat']
+        end
+
+        loc = 'lat='..(args['lat'] or dz.settings.location.latitude)
         loc = loc ..'&lon='..(args['lon'] or dz.settings.location.longitude)
-        local lang = args['lang'] or 'fr'
-        local appid = args['appid'] or dz.variables('openweathermap_appid').value
+        lang = args['lang'] or DZ_LANG
+        appid = args['appid'] or dz.variables('openweathermap_appid').value
 
         local r = {}
 

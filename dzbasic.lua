@@ -1,19 +1,21 @@
 --[[
 name : dzBasic.lua
-version: 1.0 beta 1.1
+version: 1.0 beta 3
 
 author : casanoe
 creation : 16/04/2021
-update : 25/04/2021
+update : 05/05/2021
 
-CHANGELOG:
-* 1.0 beta 1.1: add support of uservariable 'dzBasic' (content interpreted by dzBasic)
+CHANGELOG (dzBasic + global_data):
+* 1.0 beta 1: first version
+* 1.0 beta 2: add support of uservariable 'dzBasic' (content interpreted by dzBasic)
+* 1.0 beta 3: event system improvement and corrections, add geoloc function
 
 --]]
 
 -- Script description
 local scriptName = 'dzBasic'
-local scriptVersion = '1.0 beta 1.1'
+local scriptVersion = '1.0 beta'
 
 -- Dzvents
 return {
@@ -46,11 +48,6 @@ return {
         local dzu = dz.utils
         local lodash = dzu._
 
-        DZB_TIMEOUT = 2
-
-        DZ_BATTERY_THRESHOLD = 10
-        DZ_SIGNAL_THRESHOLD = 10
-
         dz.helpers.load_dzBasicLibs(dz)
 
         -----------------
@@ -78,7 +75,7 @@ return {
                 {'(%a[%w_]*)', 'ALPHA'},
                 {'([ \t]+)', 'SPACE'},
                 {'([\n\r][ \t\n\r]*)', 'NEWLINE'},
-                {'(:;)', 'COLON'},
+                {'([:;])', 'COLON'},
                 {'%-%-%[%[.*', 'DESC'},
                 {'%-%-[^\n\r]*', 'REM'},
                 {'([~=<>]=?)', 'COMP'},
@@ -90,6 +87,7 @@ return {
                 {'(.)', 'OTHER'}
             }
             microbasic.hide = 'NEWLINE|REM|SPACE|LABEL|COLON'
+            microbasic.expr = 'IDENT|FUNC|BOOLOP|UNIOP|CONST|PARENTHESE|BRACKET|ARITH|COMP|NUMBER|STRING'
         end
 
         function raz()
@@ -111,6 +109,8 @@ return {
             dzlog(string.format('[%s](%d) ERROR - %s', microbasic.marker, microbasic.curtok, s), 'error')
             stop()
         end
+
+        function printif(i, ...) if i == microbasic.curdev.idx then aprint(...) end end
 
         function finish()
             for x, y in pairs(microbasic.expects) do
@@ -194,8 +194,8 @@ return {
 
         function expr()
             local c = 'return '
-            local n, t = need_list(nil, 'IDENT|FUNC|BOOLOP|UNIOP|CONST|PARENTHESE|BRACKET|ARITH|COMP|NUMBER|STRING')
-            if #n > 0 then
+            local n, t = need_list(false, microbasic.expr)
+            if t[1] then
                 for k, v in pairs(t) do
                     if v == 'FUNC' then c = c..'f_'..n[k]:lower()
                     elseif v == 'IDENT' then c = c..'get_var("'..n[k]..'")'
@@ -219,7 +219,7 @@ return {
             local z = #{...}
             local args = sep and {sep, ...} or {...}
             args[1] = '?'..args[1]
-            while n[1] do
+            while t[1] do
                 table.insert(r1, z == 1 and n[1] or n)
                 table.insert(r2, z == 1 and t[1] or t)
                 n, t = need(table.unpack(args))
@@ -245,7 +245,7 @@ return {
                     nexttok()
                     return true, c[2], c[1]
                 end
-                if x == 'EXPR' then
+                if x == 'EXPR' and strFind(microbasic.expr, c[1]) then
                     local ok, v = expr()
                     if ok then return ok, v, 'EXPR' end
                 end
@@ -260,7 +260,7 @@ return {
                 b, n, t = need_tok(v:gsub('%?', ''))
                 if not b and v:sub(1, 1) == '?' then break end
                 if not b and not v:find('%?') then
-                    err('parse error, '..v..' expected')
+                    err('parse error, '..v..' expected (rank '..i..'), '..(t or 'nil')..' found')
                     break
                 end
                 r1[i] = n
@@ -329,7 +329,8 @@ return {
         function f_cleanstr(s) return s:lower():gsub("^%s*(.-)%s*$", "%1"):gsub('%s+', ' ') end
         function f_int(s) return tonumber(s) end
         function f_script(s) return fromData(executeScript(s)) end
-        function f_curl(s) return fromData(simpleCurl(s)) end
+        function f_url(s) return fromData(simpleCurl(s)) end
+        function f_curl(s) return f_url(s) end
 
         -----------------
         --   DZBASIC   --
@@ -382,7 +383,7 @@ return {
 
         function w_print()
             local n = need_list(',', 'EXPR')
-            for _, v in pairs(n) do aprint(''..v) end
+            for _, v in pairs(n) do aprint(v) end
         end
 
         function w_let()
@@ -424,23 +425,25 @@ return {
         end
 
         function w_auto()
-            local n1 = need('on|off|toggle|dim|level|update')
+            local n1 = need('onoff|on|off|toggle|dim|level|update')
             local n2 = (n1[1] == 'dim' and need('NUMBER', '?,', 'NUMBER')) or
             (n1[1] == 'level' and need('ALPHA|NUMBER|STRING')) or
             (n1[1] == 'update' and need('EXPR')) or {}
             local n3 = need('STRING?', 'at|after|when?')
-            local n4 = (n3[2] == 'at' and need('STRING')) or (n3[2] == 'after' and need('?NUMBER')) or won()
+            local n4 = (n3[2] == 'at' and need('STRING')) or (n3[2] == 'when' and won()) or need('NUMBER?')
 
             local b = false
             if event('dz_timer') and n3[2] == 'at' then
                 b = timeRule(n4[1])
-            elseif event('dz_timer') and n3[2] == 'after' then
-                b = microbasic.curdev.lastUpdate.minutesAgo >= (n4[1] or 1)
             elseif n3[2] == 'when' then
-                b = won()
+                b = n4
+            elseif event('dz_timer') then
+                b = microbasic.curdev.lastUpdate.minutesAgo >= (n4[1] or 1)
             end
 
-            if b then
+            if n1[1] == 'onoff' then
+                dzbswitch(microbasic.curdev.idx, b and 'on' or 'off', {checkfirst = true})
+            elseif b then
                 if n1[1] == 'dim' and microbasic.curdev.switchType == "Dimmer" and microbasic.curdev.active then
                     local l = constrain(microbasic.curdev.level + (tonumber(n2[1]) or 10), 0, n2[3] or 100)
                     if l ~= microbasic.curdev.level then microbasic.curdev.dimTo(l) end
@@ -456,47 +459,61 @@ return {
             end
         end
 
-        function won()
-            local n, t = need_list(',', 'ALPHA|EXPR', 'STRING|ALPHA?', '?COMP', 'ALPHA|EXPR')
+        function won(ev)
+            local n1, t1, n2, t2, n3
+            local x, d
+            local op = ''
             local b = true
-            for k, v in ipairs(n) do
-                if t[k][1] == 'ALPHA' and not v[3] then
-                    b = b and mevent(v[1])
-                elseif not v[3] and t[k][1] == 'EXPR' then b = b and v[1]
-                elseif v[3] and t[k][1] == 'ALPHA' then
-                    local d = v[2] or microbasic.curdev.idx
-                    if v[1] == 'time' then b = b and timeRule(v[4])
-                    elseif t[k][2] == 'ALPHA' then
-                        b = b and state_managedEvent(v[1])
-                        if state_managedEvent(v[1]) then
-                            e = managedEvent(v[1])
-                            if v[2] == 'duration' then b = b and _cmp(e.first, v[4], v[3])
-                            elseif v[2] == 'repeat' then b = b and _cmp(e.nb, v[4], v[3])
-                            end
-                        end
-                    elseif v[1] == 'secondsago' then
-                        b = b and group_cmp(d, {'lastUpdate', 'secondsAgo'}, v[4], v[3])
-                    elseif v[1] == 'minutesago' then
-                        b = b and group_cmp(d, {'lastUpdate', 'minutesAgo'}, v[4], v[3])
-                    elseif v[1] == 'state' then
-                        if v[4] == 'allon' then b = b and group_cmp(d, 'active', true)
-                        elseif v[4] == 'alloff' then b = b and group_cmp(d, 'active', false)
-                        elseif v[4] == 'off' then b = b and not group_cmp(d, 'active', true)
-                        elseif v[4] == 'on' then b = b and not group_cmp(d, 'active', false)
-                        end
-                    else
-                        b = b and group_cmp(v[2], v[1], v[4], v[3])
+            repeat
+                x = nil
+                n1, t1 = need('ALPHA|EXPR')
+
+                if t1[1] == 'EXPR' then
+                    x = n1[1] ~= nil and n1[1] ~= false
+                elseif n1[1] == 'time' then
+                    n2, t2 = need('=', 'STRING')
+                    x = timeRule(n2[2])
+                elseif n1[1] == 'secondsago' or n1[1] == 'minutesago' then
+                    n2, t2 = need('STRING?', 'COMP', 'EXPR')
+                    d = n2[1] or microbasic.curdev.idx
+                    z = n1[1] == 'secondsago' and 'secondsAgo' or 'minutesAgo'
+                    x = group_cmp(d, {'lastUpdate', z}, n2[3], n2[2])
+                elseif n1[1] == 'state' then
+                    n2, t2 = need('STRING?', '=', 'on|off|allon|alloff')
+                    d = n2[1] or microbasic.curdev.idx
+                    if n2[3] == 'allon' then x = group_cmp(d, 'active', true)
+                    elseif n2[3] == 'alloff' then x = group_cmp(d, 'active', false)
+                    elseif n2[3] == 'off' then x = not group_cmp(d, 'active', true)
+                    elseif n2[3] == 'on' then x = not group_cmp(d, 'active', false)
                     end
-                else err("wrong 'event' syntax")
+                elseif n1[1] == 'repeat' and ev then
+                    n2, t2 = need('COMP', 'EXPR')
+                    e = managedEvent(ev)
+                    x = _cmp(e.nb, n2[2], n2[1])
+                else
+                    n3 = need('ALPHA?')
+                    if n3[1] == 'repeat' or n3[1] == 'duration' then
+                        n2, t2 = need('COMP', 'EXPR')
+                        e = managedEvent(n1[1])
+                        z = n3[1] == 'duration' and e.last - e.first or n3[1] == 'repeat' and e.nb
+                        x = _cmp(z, n2[2], n2[1])
+                    elseif not n3[1] then
+                        x = (mevent(n1[1]) == true)
+                    end
                 end
-            end
+
+                if x == nil then return err("wrong 'event' syntax") end
+                --if op == 'or' then b = b or x else b = b and x end
+                b = b and x
+                op = need(',?')[1]
+            until op == nil
             return b
         end
 
         function w_event()
             local n = need('ALPHA', '?when|on|off')
             if n[2] == 'when' then
-                managedEvent(n[1], won())
+                managedEvent(n[1], won(n[1]))
             else
                 mevent(n[1], n[2] ~= 'off')
             end
@@ -512,14 +529,16 @@ return {
 
         function w_update()
             local n = need('EXPR', '?,', 'STRING|NUMBER')
-            dzbupdate(n[3] or microbasic.curdev.idx, n[1])
+            local h = dzbupdate(n[3] or microbasic.curdev.idx, n[1])
+            if not n[3] then event('dz_selfchange', h) end
         end
 
         function w_switch()
             local n1 = need('on|off|toggle|flash', ',?', 'STRING|NUMBER?', ',?')
             local c = n1[1]:sub(1, 1):upper()..n1[1]:sub(2)
             local n2 = ((n1[2] and not n1[3]) or n1[4]) and need_list_args()
-            dzbswitch(n1[3] or microbasic.curdev.idx, c, n2)
+            local h = dzbswitch(n1[3] or microbasic.curdev.idx, c, n2)
+            if not n1[3] then event('dz_selfchange', h) end
         end
 
         function w_notification()
@@ -581,25 +600,38 @@ return {
         end
 
         function w_dzb()
+            local d
             local n = need('ALPHA', '?EXPR')
             if n[1] == 'initiglobaldata' then
+                aprint("<DZB> Initialize global datas")
                 init_globalData()
+            elseif n[1] == 'printglobaldata' then
+                aprint("<DZB> Global datas:")
+                tprint(dz.globalData.globalvars)
             elseif n[1] == 'printeventdump' then
-                aprint("<DZB> DUMP event "..n[2]..", STATE= "..tostring(mevent(n[2])), managedEvent(n[2]))
+                aprint("<DZB> DUMP event "..n[2])
+                aprint("STATE= "..tostring(mevent(n[2]) or false), managedEvent(n[2]))
+            elseif n[1] == 'printallevents' then
+                aprint("<DZB> DUMP events ")
+                aprint(dz.globalData.managedEvent)
             elseif n[1] == 'clearallevents' then
                 microbasic.events = {}
                 dz.globalData.initialize('managedEvent')
+                aprint("<DZB> Clear all events")
             elseif n[1] == 'clearallvars' then
                 microbasic.vars = {}
                 dz.globalData.initialize('globalvars')
+                aprint("<DZB> Clear local vars and initialize global datas")
             elseif n[1] == 'printdevicedump' then
-                aprint("<DZB> DUMP device "..microbasic.curdev.name)
-                microbasic.curdev.dump()
+                d = n[2] and getItem(n[2]) or microbasic.curdev
+                aprint("<DZB> DUMP device "..d.name)
+                d.dump()
             elseif n[1] == 'moveback' then
                 microbasic.curtok = microbasic.curtok - (tonumber(n[2]) or 1)
             elseif n[1] == 'moveforward' then
                 microbasic.curtok = microbasic.curtok + (tonumber(n[2]) or 1)
             elseif n[1] == 'printlextable' then
+                aprint("<DZB> Lex table of "..microbasic.curdev.name)
                 for i, v in ipairs(microbasic.lex) do print('('..i..') '..v[1]..'\t'..v[2]) end
             end
         end
@@ -657,6 +689,7 @@ return {
         context = { events = {}, vars = {} }
 
         context['vars']['DZ_STARTTIME_SEC'] = dz.startTime.secondsAgo
+        context['vars']['DZ_SECURITY'] = dz.security
 
         init()
 
@@ -684,7 +717,7 @@ return {
             if triggeredItem.type == 'resetAllEvents' then
                 init_globalData()
                 set_globalvars('DZ_URL', dz.settings.url)
-                sendCustomEvent('start_dzBasic')
+                sendCustomEvent('onstart_dzBasic')
             end
         elseif triggeredItem.isVariable then
             start(triggeredItem, context)
@@ -694,6 +727,7 @@ return {
                 context['events']['dz_sys'] = true
                 context['events']['dz_sys_'..triggeredItem.type] = true
                 context['vars']['DZ_SYSEVENT'] = triggeredItem.type
+                sendCustomEvent('onstart_dzBasic')
             end
             context['events']['dz_timer'] = true
             dz.devices().forEach(function(d) start(d, context) end)
@@ -701,7 +735,7 @@ return {
             dz.scenes().forEach(function(d) start(d, context) end)
         end
 
-        --dzbupdate(microbasic.logdevicetime, (os.clock() - microbasic.startclock)*1000)
+        dzbupdate(microbasic.logdevicetime, (os.clock() - microbasic.startclock) * 1000)
 
     end
 }

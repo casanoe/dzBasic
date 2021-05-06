@@ -4,7 +4,7 @@ version: 1.0
 
 description: netatmo plugin for dzbasic
 
-5 custom variables to be created :
+5 uservariables to be created :
 'netatmo_homeid'
 'netatmo_appid'
 'netatmo_appsecret'

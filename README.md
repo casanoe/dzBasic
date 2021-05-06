@@ -1,6 +1,6 @@
 ![Visitors](https://visitor-badge.glitch.me/badge?page_id=casanoe_dzBasic)
 [![Repos](https://badges.pufler.dev/repos/casanoe)](https://github.com/casanoe)
-![Updated](https://badges.pufler.dev/updated/casanoe/dzBasic)
+
 # DzBasic
 
 DzBasic is another way for scripting in Domoticz.
@@ -9,7 +9,7 @@ It is a very simple Basic like language. It proposes the most essential function
 Its main characteristics are:
 - code is stored in the description field of any devices
 - it is possible to check or make action on a group of devices in one command
-- it contains a more advanced notification system (thanks to [papoo ](https://pon.fr/dzvents-fonction-de-notification-universelle/)for the idea)
+- it contains a more advanced notification system
 - less code to make the most usually commands
 - use and simply share more complex dzVents scripts as dzBasic plugin (3 more commands line are enough)
 
@@ -316,7 +316,7 @@ at "<time_rule>" : ... <line_break>
 -- if the last update was made time_in_minutes ago (or more)
 after <time_in_minutes> : ... <line_break>
 -- automatic action
-auto on|off|toggle ["<list_of_device_names>"] at "<time_rule>"|after <number>|when <event_conditions>
+auto on|off|onoff|toggle ["<list_of_device_names>"] at "<time_rule>"|after <number>|when <event_conditions>
 auto update <expression> ["<list_of_device_names>"] at "<time_rule>"|after <number>|when <event_conditions>
 auto dim <number>[, <number>] ["<list_of_device_names>"] at "<time_rule>"|after <number>|when <event_conditions>
 auto level <level_name>|<number>|"<level_name>" ["<list_of_device_names>"] at "<time_rule>"|after <number>|when <event_conditions>
@@ -356,6 +356,7 @@ These event names are reserved.
 dz_timer        (every minute)
 dz_switchon     (the switch has just been turned on)
 dz_switchoff    (the switch has just been turned off)
+dz_selfchange   (the switch has just been updated with a new value)
 dz_update       (the switch has just been updated)
 dz_level_<name> (the level has just been changed to <name>)
 dz_switchlevel  (the level has just been changed)
@@ -497,16 +498,20 @@ Please read [CONTRIBUTING.md](https://github.com/casanoe/dzBasic/blob/master/CON
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
 
 ## Acknowledgments
-
+- Inspiration:
+  - Thanks to [papoo ](https://pon.fr/dzvents-fonction-de-notification-universelle/) : jsondescription and notification scripts
 
 
 ## DzBasic version History
+### [1.0 beta 3]
+Date: 2 May 2021
+- Add support of uservariable 'dzBasic' (content interpreted by dzBasic)
+### [1.0 beta 2]
+Date: 29 April 2021
+- Add support of uservariable 'dzBasic' (content interpreted by dzBasic)
 ### [1.0 beta 1]
 Date: 25 April 2021
 - First version, first beta
 - Simple event system
 - Simple basic commands
 - Plugin system
-### [1.0 beta 1.1]
-Date: 29 April 2021
-- Add support of uservariable 'dzBasic' (content interpreted by dzBasic)
