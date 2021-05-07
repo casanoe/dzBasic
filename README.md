@@ -3,7 +3,8 @@
 
 # DzBasic
 
-DzBasic is another way for scripting in Domoticz.
+DzBasic is a basic script system for simple and classic uses in Domoticz.
+
 It is a very simple Basic like language. It proposes the most essential functionalities and a simple event system.
 
 Its main characteristics are:
@@ -499,7 +500,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 - Inspiration:
-  - Thanks to [papoo ](https://pon.fr/dzvents-fonction-de-notification-universelle/) : jsondescription and notification scripts
+  - Thanks to [papoo](https://pon.fr/dzvents-fonction-de-notification-universelle/) : jsondescription and notification scripts
+- Thanks to dannybloe for his powerful framework [dzVents](https://github.com/dannybloe/dzVents)
 
 
 ## DzBasic version History

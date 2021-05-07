@@ -14,7 +14,8 @@ return {
     data = {
         managedEvent = { initial = {} },
         globalvars = { initial = {} },
-        managedContext = { initial = {} }
+        managedContext = { initial = {} },
+        managedDevices = { initial = {} }
     },
     helpers = {
 
@@ -123,6 +124,7 @@ return {
                 dz.globalData.initialize('managedEvent')
                 dz.globalData.initialize('managedContext')
                 dz.globalData.initialize('globalvars')
+                dz.globalData.initialize('managedDevices')
             end
 
             function get_globalvars(k)

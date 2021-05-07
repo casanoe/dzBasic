@@ -29,7 +29,7 @@ return {
         httpResponses = { 'dzBasic*' },
         customEvents = { 'dzBasic*' },
         shellCommandResponses = { 'dzBasic*' },
-        system = { '*' }
+        system = { 'start', 'stop', 'resetAllEvents', 'resetAllDeviceStatus' }
     },
     logging = {
         -- level    =   domoticz.LOG_DEBUG,
@@ -49,6 +49,8 @@ return {
         local lodash = dzu._
 
         dz.helpers.load_dzBasicLibs(dz)
+
+        local TRACKTIME = false
 
         -----------------
         -- Interpreter --
@@ -71,7 +73,6 @@ return {
                 {'(%-?%d+)', 'NUMBER'},
                 {'%$([%a%$_][%w_]*)', 'IDENT'},
                 {'@(%a[%w_]*)', 'FUNC'},
-                {'(%a[%w_]*#(%w+))', 'ALPHAX'},
                 {'(%a[%w_]*)', 'ALPHA'},
                 {'([ \t]+)', 'SPACE'},
                 {'([\n\r][ \t\n\r]*)', 'NEWLINE'},
@@ -178,9 +179,9 @@ return {
                 for i, v in ipairs(microbasic.TOKENS) do
                     --b, e, s = string.find(code, '^'..v[1])
                     f = table.pack(string.find(code, '^'..v[1]))
-                    s = f[3]
-                    x = lodash.slice(f, 4)
                     if f[2] then
+                        s = f[3]
+                        x = lodash.slice(f, 4)
                         t = v[2]
                         if _G['t_'..t] then s, t = _G['t_'..t](s, #toks) end
                         if s and t ~= 'SPACE' then table.insert(toks, {t, s, x}) end
@@ -282,7 +283,7 @@ return {
         end
 
         function interpret(code, context)
-            if not string.find(code, '^'..microbasic.starter..'%s*\n') then return end
+            --if not string.find(code, '^'..microbasic.starter..'%s*\n') then return end
             raz()
             for k, v in pairs(context) do microbasic[k] = v end
             microbasic.lex = tokenize(code..'\n')
@@ -679,8 +680,15 @@ return {
             context['events']['dz_batterylow'] = device.batteryLevel and (device.batteryLevel <= DZ_BATTERY_THRESHOLD)
             context['events']['dz_timedout'] = device.timedOut
             context['events']['dz_signallow'] = device.signalLevel and (device.signalLevel <= DZ_SIGNAL_THRESHOLD)
-            local code = device.description or "dzbasic\n\r"..device.value or ''
+            --local code = device.description or "dzbasic\n\r"..device.value or ''
+            local code = device.description
             interpret(dzbformat(code, microbasic.curdev.idx), context)
+        end
+
+        function checkdevices(d)
+            if string.sub(d.description, 1, #microbasic.starter) == microbasic.starter then
+                dz.globalData.managedDevices[d.idx] = true
+            end
         end
 
         function log(s)
@@ -699,36 +707,49 @@ return {
 
         init()
 
+        local dzbtype
+
         if triggeredItem.isDevice or triggeredItem.isScene or triggeredItem.isGroup then
-            context['events']['dz_update'] = true
-            context['events']['dz_switchon'] = triggeredItem.active
-            context['events']['dz_switchoff'] = not triggeredItem.active
-            if triggeredItem.levelName then
-                context['events']['dz_level_'..triggeredItem.levelName] = true
-                context['events']['dz_switchlevel'] = true
+            dzbtype = 'Trigger Device '..triggeredItem.name
+            if dz.globalData.managedDevices[triggeredItem.idx] then
+                context['events']['dz_update'] = true
+                context['events']['dz_switchon'] = triggeredItem.active
+                context['events']['dz_switchoff'] = not triggeredItem.active
+                if triggeredItem.levelName then
+                    context['events']['dz_level_'..triggeredItem.levelName] = true
+                    context['events']['dz_switchlevel'] = true
+                end
+                start(triggeredItem, context)
             end
-            start(triggeredItem, context)
         elseif triggeredItem.isHTTPResponse or triggeredItem.isShellCommandResponse then
+            dzbtype = 'Trigger Http/Shell '..triggeredItem.trigger
             context['events']['dz_url'] = triggeredItem.isHTTPResponse
             context['events']['dz_script'] = triggeredItem.isShellCommandResponse
             context['vars']['$'] = fromData(trim(triggeredItem.data)) or ''
             start(getItem(tonumber(string.match(triggeredItem.trigger, "%d+$"))), context)
         elseif triggeredItem.isCustomEvent then
+            dzbtype = 'Trigger CustomEvent '..triggeredItem.json['event']
             context = triggeredItem.json['microbasic'] or context
             context['events']['dz_user'] = true
             context['events'][triggeredItem.json['event']] = true
             context['vars']['$'] = triggeredItem.json['returnval']
             group(triggeredItem.json['device'], function(d) start(d, context) end)
         elseif triggeredItem.isSystemEvent and triggeredItem.type ~= 'start' and triggeredItem.type ~= 'stop' then
+            dzbtype = 'Trigger SystemEvent '..triggeredItem.type
+            init_globalData()
             if triggeredItem.type == 'resetAllEvents' then
-                init_globalData()
                 set_globalvars('DZ_URL', dz.settings.url)
                 sendCustomEvent('onstart_dzBasic')
             end
+            dz.devices().forEach(checkdevices)
+            dz.groups().forEach(checkdevices)
+            dz.scenes().forEach(checkdevices)
+            tprint(dz.globalData.managedDevices)
         elseif triggeredItem.isVariable then
             start(triggeredItem, context)
             triggeredItem.set('').silent()
         else
+            dzbtype = 'Trigger Timer'
             if triggeredItem.isSystemEvent then
                 context['events']['dz_sys'] = true
                 context['events']['dz_sys_'..triggeredItem.type] = true
@@ -736,12 +757,21 @@ return {
                 sendCustomEvent('onstart_dzBasic')
             end
             context['events']['dz_timer'] = true
-            dz.devices().forEach(function(d) start(d, context) end)
-            dz.groups().forEach(function(d) start(d, context) end)
-            dz.scenes().forEach(function(d) start(d, context) end)
+            for d, b in pairs(dz.globalData.managedDevices) do
+                start(getItem(d), context)
+            end
+            --dz.devices().forEach(function(d) start(d, context) end)
+            --dz.groups().forEach(function(d) start(d, context) end)
+            --dz.scenes().forEach(function(d) start(d, context) end)
         end
 
-        dzbupdate(microbasic.logdevicetime, (os.clock() - microbasic.startclock) * 1000)
+        -----
+
+        if TRACKTIME then
+            local timeclock = (os.clock() - microbasic.startclock) * 1000
+            print('<DZB-TIME> '..dzbtype..' - '..timeclock..' ms')
+            --dzbupdate(microbasic.logdevicetime, timeclock)
+        end
 
     end
 }
