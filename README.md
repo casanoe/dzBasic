@@ -505,6 +505,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 
 ## DzBasic version History
+### [1.0 beta 4]
+Date: 9 May 2021
+- Performance improvements (only devices with code are scanned, time tracking - TRACKTIME variable -)
 ### [1.0 beta 3]
 Date: 2 May 2021
 - Add support of uservariable 'dzBasic' (content interpreted by dzBasic)

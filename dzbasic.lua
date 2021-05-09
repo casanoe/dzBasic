@@ -1,6 +1,6 @@
 --[[
 name : dzBasic.lua
-version: 1.0 beta 3
+version: 1.0 beta 4
 
 author : casanoe
 creation : 16/04/2021
