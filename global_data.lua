@@ -15,7 +15,8 @@ return {
         managedEvent = { initial = {} },
         globalvars = { initial = {} },
         managedContext = { initial = {} },
-        managedDevices = { initial = {} }
+        managedDevices = { initial = {} },
+        dzbench = { history = true, maxMinutes = 10 }
     },
     helpers = {
 
@@ -34,7 +35,6 @@ return {
 
             C_GARBAGE_EVENT_FREQ = 7 * 24 * 3600 -- every 7 days
 
-            DZB_TIMEOUT = 2
             DZ_BATTERY_THRESHOLD = 10
             DZ_SIGNAL_THRESHOLD = 10
             DZ_LANG = 'fr'
@@ -82,6 +82,15 @@ return {
                 return string.find('|'..s:lower()..'|', '|'..tostring(f):lower()..'|', 1, true) ~= nil
             end
 
+            function benchmark(s, f, ...)
+                local multiplier = 1000 -- ms
+                local now = os.clock()
+                local r = f(...)
+                local elapsed = (os.clock() - now)
+                print(string.format("<BENCHMARK> '%s' results: function calls in %2f", s, (elapsed * multiplier)))
+                return r
+            end
+
             --------------------
             --      GEO       --
             --------------------
@@ -125,6 +134,8 @@ return {
                 dz.globalData.initialize('managedContext')
                 dz.globalData.initialize('globalvars')
                 dz.globalData.initialize('managedDevices')
+                dz.globalData.initialize('dzbench')
+                dz.globalData.dzbench.reset()
             end
 
             function get_globalvars(k)
@@ -249,9 +260,7 @@ return {
                 local now = os.time(os.date('*t'))
                 local e = dz.globalData.managedEvent[id] or { nb = 0, last = now, first = 0 }
                 e.nb = (f == true and e.nb + 1) or (f == false and 0) or e.nb
-                --e.last = (f == true and now) or (f == false and 0) or e.last
                 e.last = now
-                --e.first = (e.nb == 0 and 0) or (e.nb == 1 and now) or e.first
                 e.first = (f == true and e.nb <= 1 and now) or (e.nb == 0 and 0) or e.first
                 dz.globalData.managedEvent[id] = e
                 return e
@@ -376,14 +385,17 @@ return {
                     function(d)
                         if d.switchType == 'Dimmer' and type(v) == 'number' then
                             haschanged = haschanged or (d.level ~= v)
-                            d.dimTo(constrain(v, 0, 100))
+                            if settings and settings['silent'] then d.dimTo(constrain(v, 0, 100)).silent()
+                            else d.dimTo(constrain(v, 0, 100)) end
                         elseif d.switchType == 'Selector' then
                             haschanged = haschanged or (d.levelName ~= v)
-                            d.switchSelector(v)
+                            if settings and settings['silent'] then d.switchSelector(v).silent()
+                            else d.switchSelector(v) end
                         else
                             haschanged = haschanged or (d.sValue ~= v)
                             if n then haschanged = haschanged or (d.nValue ~= n) end
-                            d.setValues(n, dzu.urlEncode(v))
+                            if settings and settings['silent'] then d.setValues(n, dzu.urlEncode(v)).silent()
+                            else d.setValues(n, dzu.urlEncode(v)) end
                         end
                     end
                 )

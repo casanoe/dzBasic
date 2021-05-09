@@ -50,7 +50,8 @@ return {
 
         dz.helpers.load_dzBasicLibs(dz)
 
-        local TRACKTIME = false
+        local TRACKTIME = false -- Performance tracking
+        local DZB_TIMEOUT = 0.5
 
         -----------------
         -- Interpreter --
@@ -103,11 +104,15 @@ return {
         end
 
         function warning(s)
-            dzlog(string.format('[%s](%d) WARNING - %s', microbasic.marker, microbasic.curtok, s), 'info')
+            print(string.format('<DZB-WARNING> [%s](%d) - %s', microbasic.curtok, s))
+        end
+
+        function info(s)
+            print(string.format('<DZB-INFO> %s', s))
         end
 
         function err(s)
-            dzlog(string.format('[%s](%d) ERROR - %s', microbasic.marker, microbasic.curtok, s), 'error')
+            print(string.format('<DZB-ERROR> (%d) - %s', microbasic.curtok, s))
             stop()
         end
 
@@ -289,6 +294,7 @@ return {
             microbasic.lex = tokenize(code..'\n')
             hide()
             while (microbasic.stop == false and microbasic.curtok <= #microbasic.lex and survey()) do
+                --benchmark('statement : '..current()[2]..' : '..microbasic.curdev.name..' : '..microbasic.curtok,statement)
                 statement()
                 hide()
             end
@@ -449,19 +455,19 @@ return {
             end
 
             if n1[1] == 'onoff' then
-                dzbswitch(microbasic.curdev.idx, b and 'on' or 'off', {checkfirst = true})
+                dzbswitch(microbasic.curdev.idx, b and 'on' or 'off', {checkfirst = true, silent = true})
             elseif b then
                 if n1[1] == 'dim' and microbasic.curdev.switchType == "Dimmer" and microbasic.curdev.active then
                     local l = constrain(microbasic.curdev.level + (tonumber(n2[1]) or 10), 0, n2[3] or 100)
-                    if l ~= microbasic.curdev.level then microbasic.curdev.dimTo(l) end
+                    if l ~= microbasic.curdev.level then microbasic.curdev.dimTo(l).silent() end
                 elseif n1[1] == 'level' then
                     if microbasic.curdev.levelName ~= n2[1] and microbasic.curdev.level ~= n2[1] then
-                        microbasic.curdev.switchSelector(n2[1])
+                        microbasic.curdev.switchSelector(n2[1]).silent()
                     end
                 elseif n1[1] == 'update' then
-                    dzbupdate(microbasic.curdev.idx, n2[1])
+                    dzbupdate(microbasic.curdev.idx, n2[1], nil, {silent = true})
                 else
-                    dzbswitch(microbasic.curdev.idx, n1[1], {checkfirst = true})
+                    dzbswitch(microbasic.curdev.idx, n1[1], {checkfirst = true, silent = true})
                 end
             end
         end
@@ -536,7 +542,7 @@ return {
 
         function w_update()
             local n = need('EXPR', '?,', 'STRING|NUMBER')
-            local h = dzbupdate(n[3] or microbasic.curdev.idx, n[1])
+            local h = dzbupdate(n[3] or microbasic.curdev.idx, n[1], nil, {silent = n[3] == nil})
             if not n[3] then event('dz_selfchange', h) end
         end
 
@@ -544,7 +550,7 @@ return {
             local n1 = need('on|off|toggle|flash', ',?', 'STRING|NUMBER?', ',?')
             local c = n1[1]:sub(1, 1):upper()..n1[1]:sub(2)
             local n2 = ((n1[2] and not n1[3]) or n1[4]) and need_list_args()
-            local h = dzbswitch(n1[3] or microbasic.curdev.idx, c, n2)
+            local h = dzbswitch(n1[3] or microbasic.curdev.idx, c, n2, {silent = n1[3] == nil})
             if not n1[3] then event('dz_selfchange', h) end
         end
 
@@ -682,11 +688,13 @@ return {
             context['events']['dz_signallow'] = device.signalLevel and (device.signalLevel <= DZ_SIGNAL_THRESHOLD)
             --local code = device.description or "dzbasic\n\r"..device.value or ''
             local code = device.description
+            --benchmark(interpret,dzbformat(code, microbasic.curdev.idx), context)
             interpret(dzbformat(code, microbasic.curdev.idx), context)
         end
 
         function checkdevices(d)
-            if string.sub(d.description, 1, #microbasic.starter) == microbasic.starter then
+            --if string.sub(d.description, 1, #microbasic.starter) == microbasic.starter then
+            if string.find(d.description, '^'..microbasic.starter..'%s*\n') then
                 dz.globalData.managedDevices[d.idx] = true
             end
         end
@@ -734,23 +742,31 @@ return {
             context['events'][triggeredItem.json['event']] = true
             context['vars']['$'] = triggeredItem.json['returnval']
             group(triggeredItem.json['device'], function(d) start(d, context) end)
-        elseif triggeredItem.isSystemEvent and triggeredItem.type ~= 'start' and triggeredItem.type ~= 'stop' then
-            dzbtype = 'Trigger SystemEvent '..triggeredItem.type
-            init_globalData()
+        elseif triggeredItem.isSystemEvent and (triggeredItem.type == 'resetAllEvents' or triggeredItem.type == 'resetAllDeviceStatus') then
             if triggeredItem.type == 'resetAllEvents' then
+                init_globalData()
                 set_globalvars('DZ_URL', dz.settings.url)
                 sendCustomEvent('onstart_dzBasic')
             end
+            dzbtype = 'Trigger SystemEvent '..triggeredItem.type
             dz.devices().forEach(checkdevices)
             dz.groups().forEach(checkdevices)
             dz.scenes().forEach(checkdevices)
-            tprint(dz.globalData.managedDevices)
+            local s = ''
+            local n = 0
+            for k, v in pairs(dz.globalData.managedDevices) do
+                n = n + 1
+                s = s..k..', '
+            end
+            info('Managed devices: '..s..' ('..n..')')
         elseif triggeredItem.isVariable then
+            dzbtype = 'Variable dzbasic'
             start(triggeredItem, context)
             triggeredItem.set('').silent()
         else
-            dzbtype = 'Trigger Timer'
+            dzbtype = 'Trigger timer'
             if triggeredItem.isSystemEvent then
+                dzbtype = 'Trigger SystemEvent '..triggeredItem.type
                 context['events']['dz_sys'] = true
                 context['events']['dz_sys_'..triggeredItem.type] = true
                 context['vars']['DZ_SYSEVENT'] = triggeredItem.type
@@ -760,16 +776,17 @@ return {
             for d, b in pairs(dz.globalData.managedDevices) do
                 start(getItem(d), context)
             end
-            --dz.devices().forEach(function(d) start(d, context) end)
-            --dz.groups().forEach(function(d) start(d, context) end)
-            --dz.scenes().forEach(function(d) start(d, context) end)
         end
 
-        -----
-
+        ---- Performance tracking
         if TRACKTIME then
             local timeclock = (os.clock() - microbasic.startclock) * 1000
-            print('<DZB-TIME> '..dzbtype..' - '..timeclock..' ms')
+            print('<DZB-TIMETRACK> TIME '..dzbtype..' = '..timeclock..' ms')
+            dz.globalData.dzbench.add(timeclock)
+            print('<DZB-TIMETRACK> AVGTIME 10min = '..dz.globalData.dzbench.avgSince('00:10:00')..' ms')
+            print('<DZB-TIMETRACK> SUMTIME 1min = '..dz.globalData.dzbench.sumSince('00:01:00')..' ms')
+            local item, index = dz.globalData.dzbench.getAtTime('00:01:00')
+            print('<DZB-TIMETRACK> NBRECORDS 1min = '..(index or 0))
             --dzbupdate(microbasic.logdevicetime, timeclock)
         end
 
