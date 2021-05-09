@@ -4,6 +4,7 @@
 # DzBasic
 
 DzBasic is a basic script system for simple and classic uses in Domoticz.
+
 It works with the powerful dzVents framework (see Acknowledgments).
 
 It is a very simple Basic like language. It proposes the most essential functionalities and a simple event system.

@@ -50,7 +50,7 @@ return {
 
         dz.helpers.load_dzBasicLibs(dz)
 
-        local TRACKTIME = false -- Performance tracking
+        local TRACKTIME = true -- Performance tracking
         local DZB_TIMEOUT = 0.5
 
         -----------------
@@ -716,10 +716,13 @@ return {
         init()
 
         local dzbtype
+        local dzbscan = 0
 
         if triggeredItem.isDevice or triggeredItem.isScene or triggeredItem.isGroup then
-            dzbtype = 'Trigger Device '..triggeredItem.name
+            dzbtype = 'Device '..triggeredItem.name..' ignored'
+            dzbscan = 1
             if dz.globalData.managedDevices[triggeredItem.idx] then
+                dzbtype = 'Trigger Device '..triggeredItem.name
                 context['events']['dz_update'] = true
                 context['events']['dz_switchon'] = triggeredItem.active
                 context['events']['dz_switchoff'] = not triggeredItem.active
@@ -735,19 +738,18 @@ return {
             context['events']['dz_script'] = triggeredItem.isShellCommandResponse
             context['vars']['$'] = fromData(trim(triggeredItem.data)) or ''
             start(getItem(tonumber(string.match(triggeredItem.trigger, "%d+$"))), context)
+            dzbscan = 1
         elseif triggeredItem.isCustomEvent then
             dzbtype = 'Trigger CustomEvent '..triggeredItem.json['event']
             context = triggeredItem.json['microbasic'] or context
             context['events']['dz_user'] = true
             context['events'][triggeredItem.json['event']] = true
             context['vars']['$'] = triggeredItem.json['returnval']
-            group(triggeredItem.json['device'], function(d) start(d, context) end)
+            dzbscan = #group(triggeredItem.json['device'], function(d) start(d, context) end)
         elseif triggeredItem.isSystemEvent and (triggeredItem.type == 'resetAllEvents' or triggeredItem.type == 'resetAllDeviceStatus') then
-            if triggeredItem.type == 'resetAllEvents' then
-                init_globalData()
-                set_globalvars('DZ_URL', dz.settings.url)
-                sendCustomEvent('onstart_dzBasic')
-            end
+            init_globalData()
+            set_globalvars('DZ_URL', dz.settings.url)
+            sendCustomEvent('onstart_dzBasic')
             dzbtype = 'Trigger SystemEvent '..triggeredItem.type
             dz.devices().forEach(checkdevices)
             dz.groups().forEach(checkdevices)
@@ -755,16 +757,17 @@ return {
             local s = ''
             local n = 0
             for k, v in pairs(dz.globalData.managedDevices) do
-                n = n + 1
+                dzbscan = dzbscan + 1
                 s = s..k..', '
             end
-            info('Managed devices: '..s..' ('..n..')')
+            info('Managed devices updated: '..s..' ('..dzbscan..')')
         elseif triggeredItem.isVariable then
             dzbtype = 'Variable dzbasic'
             start(triggeredItem, context)
             triggeredItem.set('').silent()
+            dzbscan = 1
         else
-            dzbtype = 'Trigger timer'
+            dzbtype = 'Trigger System Timer'
             if triggeredItem.isSystemEvent then
                 dzbtype = 'Trigger SystemEvent '..triggeredItem.type
                 context['events']['dz_sys'] = true
@@ -775,12 +778,15 @@ return {
             context['events']['dz_timer'] = true
             for d, b in pairs(dz.globalData.managedDevices) do
                 start(getItem(d), context)
+                dzbscan = dzbscan + 1
             end
         end
 
-        ---- Performance tracking
+        ----- Performance tracking
+
         if TRACKTIME then
             local timeclock = (os.clock() - microbasic.startclock) * 1000
+            dzbtype = dzbtype..' - Scan '..dzbscan..' devices'
             print('<DZB-TIMETRACK> TIME '..dzbtype..' = '..timeclock..' ms')
             dz.globalData.dzbench.add(timeclock)
             print('<DZB-TIMETRACK> AVGTIME 10min = '..dz.globalData.dzbench.avgSince('00:10:00')..' ms')
