@@ -50,7 +50,7 @@ return {
 
         dz.helpers.load_dzBasicLibs(dz)
 
-        local TRACKTIME = true -- Performance tracking
+        local TRACKTIME = false -- Performance tracking
         local DZB_TIMEOUT = 0.5
 
         -----------------
