@@ -1,6 +1,6 @@
 --[[
 name : dzBasic.lua
-version: 1.0 beta 4
+version: 1.0 beta 5
 
 author : casanoe
 creation : 16/04/2021
@@ -10,26 +10,32 @@ CHANGELOG (dzBasic + global_data):
 * 1.0 beta 1: first version
 * 1.0 beta 2: add support of uservariable 'dzBasic' (content interpreted by dzBasic)
 * 1.0 beta 3: event system improvement and corrections, add geoloc function
+* 1.0 beta 4: performance improvement (only devices with code in their description are scanned)
+* 1.0 beta 5: performance improvement (execute function is executed only for updated devices with dzbasic code)
 
 --]]
 
 -- Script description
-local scriptName = 'dzBasic'
+local scriptName = 'dzbasic'
 local scriptVersion = '1.0 beta'
+
+-- Load data
+local ok, f = pcall(loadfile, _G.dataFolderPath..'/__data_'..scriptName..'.lua')
+local DZBASIC_DATA = ok and f and f() or { managedDevices = {} }
 
 -- Dzvents
 return {
     active = true,
     on = {
         timer = { 'every minute' },
-        devices = { '*' },
-        groups = { '*' },
-        scenes = { '*' },
+        scenes = DZBASIC_DATA['managedDevices']['scenes'],
+        groups = DZBASIC_DATA['managedDevices']['groups'],
+        devices = DZBASIC_DATA['managedDevices']['devices'],
         variables = { 'dzBasic' },
         httpResponses = { 'dzBasic*' },
         customEvents = { 'dzBasic*' },
         shellCommandResponses = { 'dzBasic*' },
-        system = { 'start', 'stop', 'resetAllEvents', 'resetAllDeviceStatus' }
+        system = { 'start', 'stop', 'resetAllDeviceStatus' } -- 'resetAllEvents',
     },
     logging = {
         -- level    =   domoticz.LOG_DEBUG,
@@ -37,6 +43,9 @@ return {
         -- level    =   domoticz.LOG_ERROR,
         -- level    =   domoticz.LOG_MODULE_EXEC_INFO,
         marker = scriptName..' v'..scriptVersion
+    },
+    data = {
+        managedDevices = { initial = { devices = {}, scenes = {}, groups = {} } }
     },
 
     execute = function(dz, triggeredItem, info)
@@ -51,7 +60,7 @@ return {
         dz.helpers.load_dzBasicLibs(dz)
 
         local TRACKTIME = false -- Performance tracking
-        local DZB_TIMEOUT = 0.5
+        local DZB_TIMEOUT = 2 -- Timeout for dzbasic script
 
         -----------------
         -- Interpreter --
@@ -65,7 +74,6 @@ return {
             microbasic.marker = 'dzBasic'
             microbasic.starter = 'dzbasic'
             microbasic.logdevice = 'dzBasic'
-            microbasic.logdevicetime = 'dzBasictime'
             microbasic.TOKENS = {
                 {'"([^"]*)"', 'STRING'},
                 {"'([^']*)'", 'STRING'},
@@ -104,7 +112,7 @@ return {
         end
 
         function warning(s)
-            print(string.format('<DZB-WARNING> [%s](%d) - %s', microbasic.curtok, s))
+            print(string.format('<DZB-WARNING> Device "%s" (Token %d) - %s', microbasic.curdev.name, microbasic.curtok, s))
         end
 
         function info(s)
@@ -112,7 +120,7 @@ return {
         end
 
         function err(s)
-            print(string.format('<DZB-ERROR> (%d) - %s', microbasic.curtok, s))
+            print(string.format('<DZB-ERROR> Device "%s" (Token %d) - %s', microbasic.curdev.name, microbasic.curtok, s))
             stop()
         end
 
@@ -177,19 +185,17 @@ return {
         end
 
         function tokenize(code)
-            --local b, e, s, t
             local f, s, x
             local toks = {}
             while #code > 0 do
                 for i, v in ipairs(microbasic.TOKENS) do
-                    --b, e, s = string.find(code, '^'..v[1])
                     f = table.pack(string.find(code, '^'..v[1]))
                     if f[2] then
                         s = f[3]
-                        x = lodash.slice(f, 4)
+                        --x = lodash.slice(f, 4)
                         t = v[2]
                         if _G['t_'..t] then s, t = _G['t_'..t](s, #toks) end
-                        if s and t ~= 'SPACE' then table.insert(toks, {t, s, x}) end
+                        if s and t ~= 'SPACE' then table.insert(toks, {t, s}) end
                         code = code:sub(f[2] + 1)
                         break
                     end
@@ -288,13 +294,11 @@ return {
         end
 
         function interpret(code, context)
-            --if not string.find(code, '^'..microbasic.starter..'%s*\n') then return end
             raz()
             for k, v in pairs(context) do microbasic[k] = v end
             microbasic.lex = tokenize(code..'\n')
             hide()
             while (microbasic.stop == false and microbasic.curtok <= #microbasic.lex and survey()) do
-                --benchmark('statement : '..current()[2]..' : '..microbasic.curdev.name..' : '..microbasic.curtok,statement)
                 statement()
                 hide()
             end
@@ -317,7 +321,7 @@ return {
         function t_ALPHA(s, p)
             --if _G['w_'..s:lower()] then return s, 'WORD'
             if strFind('or|and', s:lower()) then return ' '..s..' ', 'BOOLOP'
-            elseif strFind('not', s:lower()) then return ' '..s..' ', 'UNIOP'
+            elseif s:lower() == 'not' then return ' '..s..' ', 'UNIOP'
             elseif strFind('false|true|nil', s:lower()) then return ' '..s..' ', 'CONST'
             else return s, 'ALPHA' end
         end
@@ -563,7 +567,7 @@ return {
                 FREQUENCY = get_var('FREQUENCY'),
                 PRIORITY = get_var('PRIORITY')
             }
-            if n[2] then settings = table_merge(settings, need_list_args()) end
+            if n[2] then settings = table.merge(settings, need_list_args()) end
             if sendNotification(n[1], settings) and get_var('NLOG') then log(n[1]) end
         end
 
@@ -616,35 +620,35 @@ return {
             local d
             local n = need('ALPHA', '?EXPR')
             if n[1] == 'initiglobaldata' then
-                aprint("<DZB> Initialize global datas")
+                info("Initialize global datas")
                 init_globalData()
             elseif n[1] == 'printglobaldata' then
-                aprint("<DZB> Global datas:")
+                info("Global datas:")
                 tprint(dz.globalData.globalvars)
             elseif n[1] == 'printeventdump' then
-                aprint("<DZB> DUMP event "..n[2])
-                aprint("STATE= "..tostring(mevent(n[2]) or false), managedEvent(n[2]))
+                info("DUMP event "..n[2])
+                info("STATE= "..tostring(mevent(n[2]) or false), managedEvent(n[2]))
             elseif n[1] == 'printallevents' then
-                aprint("<DZB> DUMP events ")
+                info("DUMP events ")
                 aprint(dz.globalData.managedEvent)
             elseif n[1] == 'clearallevents' then
                 microbasic.events = {}
                 dz.globalData.initialize('managedEvent')
-                aprint("<DZB> Clear all events")
+                info("Clear all events")
             elseif n[1] == 'clearallvars' then
                 microbasic.vars = {}
                 dz.globalData.initialize('globalvars')
-                aprint("<DZB> Clear local vars and initialize global datas")
+                info("Clear local vars and initialize global datas")
             elseif n[1] == 'printdevicedump' then
                 d = n[2] and getItem(n[2]) or microbasic.curdev
-                aprint("<DZB> DUMP device "..d.name)
+                info("DUMP device "..d.name)
                 d.dump()
             elseif n[1] == 'moveback' then
                 microbasic.curtok = microbasic.curtok - (tonumber(n[2]) or 1)
             elseif n[1] == 'moveforward' then
                 microbasic.curtok = microbasic.curtok + (tonumber(n[2]) or 1)
             elseif n[1] == 'printlextable' then
-                aprint("<DZB> Lex table of "..microbasic.curdev.name)
+                info("Lex table of "..microbasic.curdev.name)
                 for i, v in ipairs(microbasic.lex) do print('('..i..') '..v[1]..'\t'..v[2]) end
             end
         end
@@ -686,16 +690,13 @@ return {
             context['events']['dz_batterylow'] = device.batteryLevel and (device.batteryLevel <= DZ_BATTERY_THRESHOLD)
             context['events']['dz_timedout'] = device.timedOut
             context['events']['dz_signallow'] = device.signalLevel and (device.signalLevel <= DZ_SIGNAL_THRESHOLD)
-            --local code = device.description or "dzbasic\n\r"..device.value or ''
             local code = device.description
-            --benchmark(interpret,dzbformat(code, microbasic.curdev.idx), context)
             interpret(dzbformat(code, microbasic.curdev.idx), context)
         end
 
-        function checkdevices(d)
-            --if string.sub(d.description, 1, #microbasic.starter) == microbasic.starter then
+        function checkdevices(d, t)
             if string.find(d.description, '^'..microbasic.starter..'%s*\n') then
-                dz.globalData.managedDevices[d.idx] = true
+                table.insert(dz.data.managedDevices[t], d.idx)
             end
         end
 
@@ -719,24 +720,21 @@ return {
         local dzbscan = 0
 
         if triggeredItem.isDevice or triggeredItem.isScene or triggeredItem.isGroup then
-            dzbtype = 'Device '..triggeredItem.name..' ignored'
             dzbscan = 1
-            if dz.globalData.managedDevices[triggeredItem.idx] then
-                dzbtype = 'Trigger Device '..triggeredItem.name
-                context['events']['dz_update'] = true
-                context['events']['dz_switchon'] = triggeredItem.active
-                context['events']['dz_switchoff'] = not triggeredItem.active
-                if triggeredItem.levelName then
-                    context['events']['dz_level_'..triggeredItem.levelName] = true
-                    context['events']['dz_switchlevel'] = true
-                end
-                start(triggeredItem, context)
+            dzbtype = 'Trigger Device '..triggeredItem.name
+            context['events']['dz_update'] = true
+            context['events']['dz_switchon'] = triggeredItem.active
+            context['events']['dz_switchoff'] = not triggeredItem.active
+            if triggeredItem.levelName then
+                context['events']['dz_level_'..triggeredItem.levelName] = true
+                context['events']['dz_switchlevel'] = true
             end
+            start(triggeredItem, context)
         elseif triggeredItem.isHTTPResponse or triggeredItem.isShellCommandResponse then
             dzbtype = 'Trigger Http/Shell '..triggeredItem.trigger
             context['events']['dz_url'] = triggeredItem.isHTTPResponse
             context['events']['dz_script'] = triggeredItem.isShellCommandResponse
-            context['vars']['$'] = fromData(trim(triggeredItem.data)) or ''
+            context['vars']['$'] = fromData(string.trim(triggeredItem.data)) or ''
             start(getItem(tonumber(string.match(triggeredItem.trigger, "%d+$"))), context)
             dzbscan = 1
         elseif triggeredItem.isCustomEvent then
@@ -747,20 +745,18 @@ return {
             context['vars']['$'] = triggeredItem.json['returnval']
             dzbscan = #group(triggeredItem.json['device'], function(d) start(d, context) end)
         elseif triggeredItem.isSystemEvent and (triggeredItem.type == 'resetAllEvents' or triggeredItem.type == 'resetAllDeviceStatus') then
+            info('System event '..triggeredItem.type..', check devices:')
             init_globalData()
             set_globalvars('DZ_URL', dz.settings.url)
             sendCustomEvent('onstart_dzBasic')
             dzbtype = 'Trigger SystemEvent '..triggeredItem.type
-            dz.devices().forEach(checkdevices)
-            dz.groups().forEach(checkdevices)
-            dz.scenes().forEach(checkdevices)
-            local s = ''
-            local n = 0
-            for k, v in pairs(dz.globalData.managedDevices) do
-                dzbscan = dzbscan + 1
-                s = s..k..', '
-            end
-            info('Managed devices updated: '..s..' ('..dzbscan..')')
+            dz.data.initialize('managedDevices')
+            dz.devices().forEach(function(d) checkdevices(d, 'devices') end)
+            dz.groups().forEach(function(d) checkdevices(d, 'groups') end)
+            dz.scenes().forEach(function(d) checkdevices(d, 'scenes') end)
+            info(string.format('Managed devices updated: %s', table.concat(dz.data.managedDevices['devices'], ',')))
+            info(string.format('Managed scenes updated: %s', table.concat(dz.data.managedDevices['scenes'], ',')))
+            info(string.format('Managed groups updated: %s', table.concat(dz.data.managedDevices['groups'], ',')))
         elseif triggeredItem.isVariable then
             dzbtype = 'Variable dzbasic'
             start(triggeredItem, context)
@@ -776,9 +772,11 @@ return {
                 sendCustomEvent('onstart_dzBasic')
             end
             context['events']['dz_timer'] = true
-            for d, b in pairs(dz.globalData.managedDevices) do
-                start(getItem(d), context)
-                dzbscan = dzbscan + 1
+            for x, t in pairs(dz.data.managedDevices) do
+                for y, i in pairs(t) do
+                    start(dz[x](i), context)
+                    dzbscan = dzbscan + 1
+                end
             end
         end
 
@@ -787,13 +785,15 @@ return {
         if TRACKTIME then
             local timeclock = (os.clock() - microbasic.startclock) * 1000
             dzbtype = dzbtype..' - Scan '..dzbscan..' devices'
+            print('----------------')
             print('<DZB-TIMETRACK> TIME '..dzbtype..' = '..timeclock..' ms')
             dz.globalData.dzbench.add(timeclock)
             print('<DZB-TIMETRACK> AVGTIME 10min = '..dz.globalData.dzbench.avgSince('00:10:00')..' ms')
             print('<DZB-TIMETRACK> SUMTIME 1min = '..dz.globalData.dzbench.sumSince('00:01:00')..' ms')
             local item, index = dz.globalData.dzbench.getAtTime('00:01:00')
             print('<DZB-TIMETRACK> NBRECORDS 1min = '..(index or 0))
-            --dzbupdate(microbasic.logdevicetime, timeclock)
+            print('----------------')
+            --dzbupdate('dzBasictime', timeclock)
         end
 
     end

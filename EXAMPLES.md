@@ -36,6 +36,7 @@ Documentation is good, examples are better.
 - [Ex25 - Calculate every 30min the travel time between your home and the Eiffel Tower (Waze)](#ex25---calculate-every-30min-the-travel-time-between-your-home-and-the-eiffel-tower-waze)
 - [Ex26 - Meteo in Paris (OpenWeathermap)](#ex26---meteo-in-paris-openweathermap)
 - [Ex27 - French holidays in Toulouse (BigInfo)](#ex27---french-holidays-in-toulouse-biginfo)
+- [Ex28 - Battery check](#ex28---battery-check)
 - [Changelog](#changelog)
 
 <!-- /TOC -->
@@ -335,6 +336,21 @@ on minutesago >= 30
   print "Vacances à Toulouse: "..$$["BI_HOLIDAYS"]
 endon
 ```
+
+## Ex28 - Battery check
+
+```lua
+dzbasic
+on dz_batterylow: notification "Battery for %%name%% is low (<10%)"
+```
+
+or
+
+```lua
+dzbasic
+on %%batteryLevel%% < 20: notification "Battery for %%name%% is low (<20%)"
+```
+
 
 ## Changelog
 - 26/04/21 : Creation

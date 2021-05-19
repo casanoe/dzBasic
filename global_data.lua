@@ -15,7 +15,6 @@ return {
         managedEvent = { initial = {} },
         globalvars = { initial = {} },
         managedContext = { initial = {} },
-        managedDevices = { initial = {} },
         dzbench = { history = true, maxMinutes = 10 }
     },
     helpers = {
@@ -35,26 +34,45 @@ return {
 
             C_GARBAGE_EVENT_FREQ = 7 * 24 * 3600 -- every 7 days
 
+            C_CURL_PATH = '/usr/bin/curl'
+
             DZ_BATTERY_THRESHOLD = 10
             DZ_SIGNAL_THRESHOLD = 10
             DZ_LANG = 'fr'
 
             --------------------
-            --      TOOLS     --
+            --      TABLE     --
             --------------------
 
-            function table_merge(t1, t2)
+            function table.merge(t1, t2)
                 local r = {}
                 for k, v in pairs(t1) do r[k] = v end
                 for k, v in pairs(t2) do r[k] = v end
                 return r
             end
 
-            function table_clone(t)
+            function table.clone(t)
                 local r = {}
                 for k, v in pairs(t) do r[k] = v end
                 return r
             end
+
+            function table.dump(o)
+                if type(o) == 'table' then
+                    local s = '{ '
+                    for k, v in pairs(o) do
+                        if type(k) ~= 'number' then k = '"'..k..'"' end
+                        s = s .. '['..k..'] = ' .. table.dump(v) .. ','
+                    end
+                    return s .. '} '
+                else
+                    return tostring(o)
+                end
+            end
+
+            --------------------
+            --      TOOLS     --
+            --------------------
 
             function aprint(...)
                 lodash.print(...)
@@ -64,8 +82,8 @@ return {
                 for k, v in pairs(t) do print(k..' ==> '..(tostring(v) or 'nil')) end
             end
 
-            function dzlog(s, l)
-                aprint('### '..(l or 'INFO'):upper()..' >>> '..s, l and dz['LOG_'..l:upper()])
+            function strFind(s, f)
+                return string.find('|'..s:lower()..'|', '|'..tostring(f):lower()..'|', 1, true) ~= nil
             end
 
             function trim(s)
@@ -78,10 +96,6 @@ return {
                 else return x end
             end
 
-            function strFind(s, f)
-                return string.find('|'..s:lower()..'|', '|'..tostring(f):lower()..'|', 1, true) ~= nil
-            end
-
             function benchmark(s, f, ...)
                 local multiplier = 1000 -- ms
                 local now = os.clock()
@@ -89,6 +103,40 @@ return {
                 local elapsed = (os.clock() - now)
                 print(string.format("<BENCHMARK> '%s' results: function calls in %2f", s, (elapsed * multiplier)))
                 return r
+            end
+
+            function uuid(t)
+                local template = t or 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                math.randomseed(os.time())
+                return string.gsub(template, 'x', function (c)
+                    return string.format('%x', math.random(0, 0xf))
+                end)
+            end
+
+            --------------------
+            --    STRING      --
+            --------------------
+
+            function string.trim(str, ch)
+                ch = ch or "%s"
+                if str then return (str:gsub("^"..ch.."*(.-)"..ch.."*$", "%1"))
+                else return str end
+            end
+
+            function string.escape_markdown(str)
+                return tostring(str):gsub('%_', '\\_'):gsub('%[', '\\['):gsub('%*', '\\*'):gsub('%`', '\\`')
+            end
+
+            function string.escape_html(str)
+                return tostring(str):gsub('%&', '&amp;'):gsub('%<', '&lt;'):gsub('%>', '&gt;')
+            end
+
+            function string.escape_url(str)
+                return tostring(str):gsub("[^%w]", function(chr) return string.format("%%%X", string.byte(chr)) end)
+            end
+
+            function string.escape_bash(str)
+                return tostring(str):gsub('%$', ''):gsub('%^', ''):gsub('%&', ''):gsub('%|', ''):gsub('%;', '')
             end
 
             --------------------
@@ -133,7 +181,6 @@ return {
                 dz.globalData.initialize('managedEvent')
                 dz.globalData.initialize('managedContext')
                 dz.globalData.initialize('globalvars')
-                dz.globalData.initialize('managedDevices')
                 dz.globalData.initialize('dzbench')
                 dz.globalData.dzbench.reset()
             end
@@ -224,7 +271,7 @@ return {
             end
 
             function curl(url, settings)
-                local cmd = '/usr/bin/curl "'..url..'" '
+                local cmd = C_CURL_PATH..' "'..url..'" '
                 if type(settings) == 'table' then
                     if settings['headers'] then
                         for _, v in pairs(settings['headers']) do
@@ -249,7 +296,7 @@ return {
             end
 
             function simpleCurl(args, callback, timeout)
-                return executeScript('/usr/bin/curl '..args, callback, timeout)
+                return executeScript(C_CURL_PATH..' '..args, callback, timeout)
             end
 
             --------------------

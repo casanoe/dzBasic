@@ -57,6 +57,7 @@ netatmo.lua             (plugin, get information from netatmo)
 meteo.lua               (plugin, get meteo from openweathermap)
 meteofrance.lua         (plugin, get meteo from meteofrance)
 vigilance.lua           (plugin, get vigilance info from meteofrance)
+biginfo.lua             (plugn, get various informations like holidays, moon age, geographic information)
 myplugin_template.lua   (plugin template)
 ```
 
@@ -172,8 +173,6 @@ clear $var1, $var2, $var3
 
 ```
 $DZ_STARTTIME_SEC   (number of seconds the system is up)
-$DZ_LATITUDE        (latitude)
-$DZ_LONGITUDE       (longitude)
 $DZ_SYSEVENT        (name of the triggered system event, or nil)
 $DZ_URL             (Domoticz URL)
 ```
@@ -507,6 +506,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 
 ## DzBasic version History
+### [1.0 beta 5]
+Date: 9 May 2021
+- Performance improvement (execute function is executed only for updated devices with dzbasic code)
 ### [1.0 beta 4]
 Date: 9 May 2021
 - Performance improvements (only devices with code are scanned, time tracking - TRACKTIME variable -)

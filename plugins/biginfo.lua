@@ -45,7 +45,7 @@ local scriptVersion = '1.0'
 return {
     on = {
         customEvents = { 'onstart_dzBasic', 'biginfo' },
-        timer = { '00:00' },
+        timer = { '00:01' },
     },
     logging = {
         -- level    =   domoticz.LOG_DEBUG,
