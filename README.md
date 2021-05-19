@@ -507,7 +507,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## DzBasic version History
 ### [1.0 beta 5]
-Date: 9 May 2021
+Date: 19 May 2021
 - Performance improvement (execute function is executed only for updated devices with dzbasic code)
 ### [1.0 beta 4]
 Date: 9 May 2021
