@@ -1,6 +1,6 @@
 --[[
 name : vigilance.lua
-version: 1.0
+version: 1.1
 
 description: meteofrance vigilance plugin for dzbasic
 
@@ -13,13 +13,13 @@ Return: table
 
 author : casanoe
 creation : 16/04/2021
-update : 16/04/2021
+update : 02/06/2021
 
 --]]
 
 -- Script description
 local scriptName = 'vigilance'
-local scriptVersion = '1.0'
+local scriptVersion = '1.1'
 
 -- Dzvents
 return {
@@ -53,19 +53,22 @@ return {
 
         local out2 = curl('http://vigilance2019.meteofrance.com/data/NXFR33_LFPW_.xml')
         local data2 = fromData(out2)
+
         for k, v in pairs(data2['CV']['DV']) do
-            if v['_attr']['dep'] == dept then
+            if v['_attr']['dep'] == tostring(dept) then
                 r['txtcol'] = coul[tonumber(v['_attr']['coul'])]
                 r['col'] = tonumber(v['_attr']['coul'])
                 r['vigilance'] = ''
+                r['vigilances'] = {}
                 if v['risque'] then
-                    if #v['risque'] == 1 then
-                        r['vigilance'] = vigi[tonumber(v['risque']['_attr']['val'])]
+                    if v['risque']['_attr'] then
+                        r['vigilances'][1] = vigi[tonumber(v['risque']['_attr']['val'])]
                     else
                         for x, y in pairs(v['risque']) do
-                            r['vigilance'] = r['vigilance']..vigi[tonumber(y['_attr']['val'])]..', '
+                            r['vigilances'][#r['vigilances'] + 1] = vigi[tonumber(y['_attr']['val'])]
                         end
                     end
+                    r['vigilance'] = table.concat(r['vigilances'], ',')
                 end
                 break
             end

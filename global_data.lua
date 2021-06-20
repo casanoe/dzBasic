@@ -4,7 +4,7 @@ version: 1.0 beta
 
 author : casanoe
 creation : 16/04/2021
-update : 05/05/2021
+update : 19/06/2021
 
 TODO : ?
 
@@ -32,7 +32,7 @@ return {
             --      VARS      --
             --------------------
 
-            C_GARBAGE_EVENT_FREQ = 7 * 24 * 3600 -- every 7 days
+            C_GARBAGE_FREQ = 7 * 24 * 3600 -- every 7 days
 
             C_CURL_PATH = '/usr/bin/curl'
 
@@ -137,6 +137,41 @@ return {
 
             function string.escape_bash(str)
                 return tostring(str):gsub('%$', ''):gsub('%^', ''):gsub('%&', ''):gsub('%|', ''):gsub('%;', '')
+            end
+
+            function string.truncate(str, n)
+                local sep = "[?;!.]"
+                local d = nil
+                str = string.sub(str, 1, n)
+                local p = string.find(str, sep, 1)
+                d = p
+                while p do
+                    p = string.find(str, sep, p + 1)
+                    if p then
+                        d = p
+                    end
+                end
+                return(string.sub(str, 1, d))
+            end
+
+            function string.noaccent(str)
+                if (str) then
+                    str = string.gsub (str, "Ç", "C")
+                    str = string.gsub (str, "ç", "c")
+                    str = string.gsub (str, "[-èéêë']+", "e")
+                    str = string.gsub (str, "[-ÈÉÊË']+", "E")
+                    str = string.gsub (str, "[-àáâãäå']+", "a")
+                    str = string.gsub (str, "[-@ÀÁÂÃÄÅ']+", "A")
+                    str = string.gsub (str, "[-ìíîï']+", "i")
+                    str = string.gsub (str, "[-ÌÍÎÏ']+", "I")
+                    str = string.gsub (str, "[-ðòóôõö']+", "o")
+                    str = string.gsub (str, "[-ÒÓÔÕÖ']+", "O")
+                    str = string.gsub (str, "[-ùúûü']+", "u")
+                    str = string.gsub (str, "[-ÙÚÛÜ']+", "U")
+                    str = string.gsub (str, "[-ýÿ']+", "y")
+                    str = string.gsub (str, "Ý", "Y")
+                end
+                return str
             end
 
             --------------------
@@ -345,15 +380,17 @@ return {
             end
 
             function garbage_managed()
-                dzlog('Garbage managed data in progress')
-                for k, v in pairs(dz.globalData.managedEvent) do
-                    if secondsFromNow(v.last) > C_GARBAGE_EVENT_FREQ then
-                        dz.globalData.managedEvent[k] = nil
+                print('<DZB-INFO> Garbage managed data in progress')
+                for _, t in pairs({'managedEvent', 'managedContext'}) do
+                    for k, v in pairs(dz.globalData[t]) do
+                        if secondsFromNow(v.last) > C_GARBAGE_FREQ then
+                            dz.globalData[t][k] = nil
+                        end
                     end
                 end
             end
 
-            at('00:01', garbage_managed)
+            at('at 02:00', garbage_managed)
 
             function dzBasicCall_getData(id)
                 local c = managedContext(id)
@@ -411,11 +448,12 @@ return {
                 settings = settings or {}
                 group(id,
                     function(d)
-                        haschanged = haschanged or (d.state ~= c)
+                        local state = c ~= 'Off'
+                        haschanged = haschanged or (state ~= d.active)
                         if c == 'Flash' then
                             d.setState('Toggle').forSec(1).repeatAfterSec(1, 5)
-                        elseif settings['checkfirst'] and d.state == c then
-                            return
+                        elseif settings['checkfirst'] and d.active == state then
+                            return false
                         elseif settings['silent'] then
                             d.setState(c).silent()
                         else

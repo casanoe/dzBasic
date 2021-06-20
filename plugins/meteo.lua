@@ -1,6 +1,6 @@
 --[[
 name : meteo.lua
-version: 1.1
+version: 1.0
 
 description: openweathermap meteo plugin for dzbasic
 
@@ -41,7 +41,7 @@ return {
 
         dz.helpers.load_dzBasicLibs(dz)
 
-        local TIMEOUT = 15 * 60
+        local TIMEOUT = 30 * 60
 
         -----------------------------------------
 
