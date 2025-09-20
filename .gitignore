@@ -1,5 +1,8 @@
 __archives
 
+# Test files
+*.test.lua
+
 # Compiled Lua sources
 luac.out
 

@@ -1,6 +1,6 @@
 --[[
 name : biginfo.lua
-version: 1.0
+version: 1.1
 
 description: useful information updated every day.
 
@@ -33,19 +33,19 @@ $BI_SCHOOLYEAR ==> text (for country code = fr)
 
 author : casanoe
 creation : 16/04/2021
-update : 05/05/2021
+update : 19/09/2025
 
 --]]
 
 -- Script description
 local scriptName = 'biginfo'
-local scriptVersion = '1.0'
+local scriptVersion = '1.1'
 
 -- Dzvents
 return {
     on = {
         customEvents = { 'onstart_dzBasic', 'biginfo' },
-        timer = { '00:01' },
+        timer = { 'at 00:01' },
     },
     logging = {
         -- level    =   domoticz.LOG_DEBUG,
@@ -236,8 +236,14 @@ return {
             end
 
             local getHolidays = function(d, m, y, z)
-                local u = simpleCurl(string.format('"http://domogeek.entropialux.com/schoolholiday/%s/%0.2d-%0.2d-%d"', z, d, m, y))
-                return u ~= 'False', u
+                --local u = simpleCurl(string.format('"http://domogeek.entropialux.com/schoolholiday/%s/%0.2d-%0.2d-%d"', z, d, m, y))
+                local x = string.format("%d-%0.2d-%0.2d", y, m, d)
+                local a = string.format('"https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?select=description&where=start_date%%3C%%3D%%22%s%%22%%20AND%%20end_date%%3E%%3D%%22%s%%22&limit=1&refine=zones%%3A%%22Zone%%20%s%%22&refine=population%%3A%%22%%C3%%89l%%C3%%A8ves%%22"',x,x,z)
+                --local a = "https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?select=description&where=start_date%3C%3D%22"..x.."%22%20AND%20end_date%3E%3D%22"..x.."%22&limit=1&refine=zones%3A%22Zone%20"..z.."%22&refine=population%3A%22%C3%89l%C3%A8ves%22"
+                local u = simpleCurl(a)
+                local r = fromData(u)
+                local c = tonumber(r["total_count"])
+                return c > 0, (c > 0 and r["results"][1]["description"]) or "-"
             end
 
             globals['BI_GEONUMDEPT'] = string.sub(globals['BI_GEOPOSTCODE'] or '', 1, 2)
@@ -248,7 +254,7 @@ return {
 
         end
         ----
-
+        -- tprint(globals)
         if triggeredItem.trigger == 'biginfo' then
             dzBasicCall_return('biginfo', globals, TIMEOUT)
         else

@@ -63,7 +63,7 @@ return {
 
         local r = {}
 
-        local out1 = curl('http://api.openweathermap.org/data/2.5/onecall?'..loc..'&units=metric&lang='..lang..'&exclude=minutely&appid='..appid, {timeout = 5})
+        local out1 = curl('http://api.openweathermap.org/data/3.0/onecall?'..loc..'&units=metric&lang='..lang..'&exclude=minutely&appid='..appid, {timeout = 5})
         local data1 = fromData(out1)
 
         r['clouds'] = data1['current']['clouds']

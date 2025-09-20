@@ -1,6 +1,6 @@
 --[[
 name : waze.lua
-version: 1.0
+version: 1.1
 
 description: plugin for dzbasic; calculate travel time with Waze
 
@@ -15,7 +15,7 @@ Return a table with 2 values:
 
 author : casanoe
 creation : 16/04/2021
-update : 05/05/2021
+update : 13/09/2025
 
 --]]
 
@@ -45,7 +45,7 @@ return {
         local destaddr, destlon, destlat, startaddr, startlon, startlat, r
 
         if args['dest_addr'] then
-            destaddr = geoLoc(args['dest_addr'])[1]
+            destaddr = geoLoc(args['dest_addr'])
             destlon = destaddr['lon']
             destlat = destaddr['lat']
         else
