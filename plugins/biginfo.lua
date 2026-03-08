@@ -236,10 +236,9 @@ return {
             end
 
             local getHolidays = function(d, m, y, z)
-                --local u = simpleCurl(string.format('"http://domogeek.entropialux.com/schoolholiday/%s/%0.2d-%0.2d-%d"', z, d, m, y))
                 local x = string.format("%d-%0.2d-%0.2d", y, m, d)
-                local a = string.format('"https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?select=description&where=start_date%%3C%%3D%%22%s%%22%%20AND%%20end_date%%3E%%3D%%22%s%%22&limit=1&refine=zones%%3A%%22Zone%%20%s%%22&refine=population%%3A%%22%%C3%%89l%%C3%%A8ves%%22"',x,x,z)
-                --local a = "https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?select=description&where=start_date%3C%3D%22"..x.."%22%20AND%20end_date%3E%3D%22"..x.."%22&limit=1&refine=zones%3A%22Zone%20"..z.."%22&refine=population%3A%22%C3%89l%C3%A8ves%22"
+                local a = string.format('"https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?select=description&where=start_date%%20%%3C%%3D%%20date%%27%s%%27%%20and%%20end_date%%20%%3E%%3D%%20date%%27%s%%27%%20and%%20zones%%3D%%22Zone%%20%s%%22&limit=1"', x, x, z)
+                --aprint(a)
                 local u = simpleCurl(a)
                 local r = fromData(u)
                 local c = tonumber(r["total_count"])

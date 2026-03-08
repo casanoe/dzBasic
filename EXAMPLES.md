@@ -37,6 +37,8 @@ Documentation is good, examples are better.
 - [Ex26 - Meteo in Paris (OpenWeathermap)](#ex26---meteo-in-paris-openweathermap)
 - [Ex27 - French holidays in Toulouse (BigInfo)](#ex27---french-holidays-in-toulouse-biginfo)
 - [Ex28 - Battery check](#ex28---battery-check)
+- [Ex29 - Yahoo finance](#ex29---yahoo-finance)
+- [Ex30 - Tempo EDF (France)](#ex30---tempo-edf-france)
 - [Changelog](#changelog)
 
 <!-- /TOC -->
@@ -221,6 +223,19 @@ on dz_update
 endon
 ```
 
+or if using tgmbot plugin (not real time, updated every minute)
+```lua
+dzbasic
+call tgmbot
+on $TGMBOT_TRIGGER
+  $text = @cleanstr($TGMBOT_MSG)
+  if $text == "alarm on": switch on "Alarm"
+  if $text == "alarm off": switch off "Alarm"
+  if $text == "lights off": switch off "Lights"
+  notification "Ok, well received", SUBSYSTEMS = "TELEGRAM"
+endon
+```
+
 ## Ex19 - French holidays
 
 ```lua
@@ -351,6 +366,25 @@ dzbasic
 on %%batteryLevel%% < 20: notification "Battery for %%name%% is low (<20%)"
 ```
 
+## Ex29 - Yahoo finance
+Prerequisite : create a custom sensor and put this code in description
+```lua
+dzbasic
+on minutesago >= 30, time="at daytime except on sat,sun"
+  $CURLARGS = "-A 'Mozilla/5.0'"
+  url "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?range=1d&interval=1h"
+  update $$["chart"]["result"][1]["meta"]["regularMarketPrice"] 
+endon
+```
+
+## Ex30 - Tempo EDF (France)
+```lua
+dzbasic
+on minutesago >= 60
+  url "https://www.api-couleur-tempo.fr/api/jourTempo/today"
+  update $$["libCouleur"]
+endon
+```
 
 ## Changelog
 - 26/04/21 : Creation
@@ -359,3 +393,4 @@ on %%batteryLevel%% < 20: notification "Battery for %%name%% is low (<20%)"
 - 28/04/21 : Addon, improve explication, corrections
 - 29/04/21 : Addon, corrections
 - 05/05/21 : Addon, corrections
+- 23/10/25 : Addon, corrections

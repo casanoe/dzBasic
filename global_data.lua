@@ -1,10 +1,10 @@
 --[[
 name : global_data.lua
-version: 1.0 beta
+version: 1.2
 
 author : casanoe
 creation : 16/04/2021
-update : 19/06/2021
+update : 08/03/2026
 
 TODO : ?
 
@@ -55,6 +55,15 @@ return {
                 local r = {}
                 for k, v in pairs(t) do r[k] = v end
                 return r
+            end
+            
+            function table.find(list, f) 
+                for k, v in ipairs(list) do
+                    if v == f then
+                        return k
+                    end
+                end
+                return nil
             end
 
             function table.dump(o)
@@ -186,6 +195,7 @@ return {
                     u = simpleCurl('"https://nominatim.openstreetmap.org/reverse?lat='..lat..'&lon='..lon..'&format=jsonv2&zoom=10"')
                     return fromData(u)
                 else
+                    --print('"https://nominatim.openstreetmap.org/search?q='..dzu.urlEncode(addr)..'&format=jsonv2&addressdetails=1"')
                     u = simpleCurl('"https://nominatim.openstreetmap.org/search?q='..dzu.urlEncode(addr)..'&format=jsonv2&addressdetails=1"')
                     return fromData(u)[1]
                 end
@@ -306,7 +316,10 @@ return {
             end
 
             function curl(url, settings)
-                local cmd = C_CURL_PATH..' "'..url..'" '
+                local cmd = C_CURL_PATH
+                if type(settings) == 'string' then
+                      cmd = cmd.." "..settings  
+                end
                 if type(settings) == 'table' then
                     if settings['headers'] then
                         for _, v in pairs(settings['headers']) do
@@ -320,14 +333,14 @@ return {
                         end
                         cmd = cmd..'" '
                     end
-                    cmd = cmd..'-X '..(settings['method'] or 'GET')
+                    cmd = cmd..' -X '..(settings['method'] or 'GET')
                     if not settings['callback'] and settings['timeout'] then
-                        cmd = cmd..' '..'--connect-timeout '..tostring(settings['timeout'])
+                        cmd = cmd..' --connect-timeout '..tostring(settings['timeout'])
                     else
-                        return executeScript(cmd, settings['callback'], settings['timeout'])
+                        return executeScript(cmd..' "'..url..'" ', settings['callback'], settings['timeout'])
                     end
                 end
-                return executeScript(cmd)
+                return executeScript(cmd..' "'..url..'" ')
             end
 
             function simpleCurl(args, callback, timeout)
@@ -468,6 +481,7 @@ return {
                 local haschanged = false
                 group(id,
                     function(d)
+                        --print(d.switchType.." **** "..d.deviceType)
                         if d.switchType == 'Dimmer' and type(v) == 'number' then
                             haschanged = haschanged or (d.level ~= v)
                             if settings and settings['silent'] then d.dimTo(constrain(v, 0, 100)).silent()
@@ -476,9 +490,14 @@ return {
                             haschanged = haschanged or (d.levelName ~= v)
                             if settings and settings['silent'] then d.switchSelector(v).silent()
                             else d.switchSelector(v) end
+                        elseif d.deviceType == 'Air Quality' then
+                            haschanged = haschanged or (d.co2 ~= v)
+                            if settings and settings['silent'] then d.updateAirQuality(v).silent()
+                            else d.updateAirQuality(v) end
                         else
                             haschanged = haschanged or (d.sValue ~= v)
                             if n then haschanged = haschanged or (d.nValue ~= n) end
+                            if settings and settings['checkfirst'] and not haschanged then return false end
                             if settings and settings['silent'] then d.setValues(n, dzu.urlEncode(v)).silent()
                             else d.setValues(n, dzu.urlEncode(v)) end
                         end

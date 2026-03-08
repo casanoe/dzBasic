@@ -1,6 +1,6 @@
 --[[
 name : waze.lua
-version: 1.1
+version: 1.2
 
 description: plugin for dzbasic; calculate travel time with Waze
 
@@ -15,7 +15,7 @@ Return a table with 2 values:
 
 author : casanoe
 creation : 16/04/2021
-update : 13/09/2025
+update : 08/03/2026
 
 --]]
 
@@ -62,12 +62,12 @@ return {
         end
 
         if startlon and destlon then
-            local out = osCommand('/usr/bin/curl --referer https://www.waze.com "https://www.waze.com/row-RoutingManager/routingRequest?from=x%3A'..startlon..'+y%3A'..startlat..'&to=x%3A'..destlon..'+y%3A'..destlat..'&returnJSON=true&timeout=6000&nPaths=1&options=AVOID_TRAILS%3At%2CALLOW_UTURNS"')
+            local out = curl('https://routing-livemap-row.waze.com/RoutingManager/routingRequest?from=x%3A'..startlon..'+y%3A'..startlat..'&to=x%3A'..destlon..'+y%3A'..destlat..'&returnJSON=true&timeout=6000&nPaths=1&options=AVOID_TRAILS%3At%2CALLOW_UTURNS','--referer ""')
             local data = fromData(out)
             r = {}
             local routeTotalTimeSec = tonumber(data['response']['totalRouteTime'])
             r['totalRouteTime'] = routeTotalTimeSec / 60 - ((routeTotalTimeSec%60) / 60)
-            r['routeName'] = data['response']['routeName']
+            r['routeName'] = data['response']['routeName']  
         else r = 'Err' end
 
         dzBasicCall_return('waze', r, TIMEOUT)

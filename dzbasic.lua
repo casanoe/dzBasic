@@ -577,7 +577,9 @@ return {
             (n[3] == 'cb') and 'dzBasic_url_'..microbasic.curdev.idx or
             (n[3] == 'bg') and '_dzBasic_nope' or
             nil
-            set_var('$', fromData(simpleCurl(n[1], cb, n[5])) )
+            local curlargs = get_var('CURLARGS')
+            local cmd = string.format("%s \"%s\"", curlargs or '', n[1])
+            set_var('$', fromData(simpleCurl(cmd, cb, n[5])) )
         end
 
         function w_log()
